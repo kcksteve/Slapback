@@ -1,0 +1,9 @@
+@font-face {
+    font-family: thirteenPixels;
+    src: url("/fonts/Thirteen-Pixel-Fonts.ttf")
+}
+
+#gameFont1 {
+    font-family: thirteenPixels;
+    font-size: 0;
+}
