@@ -1,5 +1,5 @@
 {
     "typeAcquisition": {
-      "include": ["pixi.js"]
+      "include": ["js/pixi.js"]
     }
   }

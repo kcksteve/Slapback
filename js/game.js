@@ -1,17 +1,27 @@
 let app;
+const basePlayerSpeed = 40;
+const chargedPlayerSpeed = 60;
+const fullPlayerCharge = 6;
+const playAreaOffset = 20;
+const paddleYGap = 10;
 let p1;
 let p1Score;
 let p1ScoreTxt;
+let p1Speed;
+let p1Charge;
 let p2;
 let p2Score;
 let p2ScoreTxt;
+let p2Speed;
+let p2Charge;
 let bgSprite;
 let ballSprite;
 let ballAngle;
+let gameRunning;
 let keys = {};
 
 //Setup after loading
-window.onload = function(){
+window.onload = () => {
     app = new PIXI.Application(
         {
             width: 800,
@@ -23,12 +33,6 @@ window.onload = function(){
     //Add pixi to body
     document.body.appendChild(app.view);
 
-    //Styling
-    document.body.style.backgroundColor = "#0D0D0D";
-    document.body.style.display = "flex";
-    document.body.style.justifyContent = "center";
-    document.body.style.flexDirection = "column";
-
     //SetupFunctions
     setupUI();
     setupPlayers();
@@ -38,10 +42,11 @@ window.onload = function(){
     
     window.addEventListener("keydown", keysDown);
     window.addEventListener("keyup", keysUp);
-    app.ticker.add(gameLooop);
+    app.ticker.add(gameLoop);
 }
 
-function setupPlayers() {
+//Setup player paddles and data
+let setupPlayers = () => {
     const offsetFromEdge = 50;
 
     //Setup player 1
@@ -52,7 +57,8 @@ function setupPlayers() {
     p1.zIndex = 11;
     app.stage.addChild(p1);
     p1Score = 0;
-    
+    p1Charge = 0;
+
     //Setup player 2
     p2 = new PIXI.Sprite.from("images/Paddle.png");
     p2.anchor.set(0.5);
@@ -61,11 +67,11 @@ function setupPlayers() {
     p2.zIndex = 10;
     app.stage.addChild(p2);
     p2Score = 0;
+    p2Charge = 0;
 }
 
-
-function setupLevel(){
-    //Setup the play area sprite
+//Setup play area
+let setupLevel = () => {
     bgSprite = new PIXI.Sprite.from("images/PlayArea.png");
     bgSprite.anchor.set(0.5);
     bgSprite.x = app.view.width / 2;
@@ -74,7 +80,8 @@ function setupLevel(){
     app.stage.addChild(bgSprite);
 }
 
-function setupUI(){
+//Setup game playe ui
+let setupUI = () => {
     const scoreTxtXOffset = 10;
     const scoreTxtY = 100;
     const scoreTxtStyle = new PIXI.TextStyle({
@@ -101,41 +108,135 @@ function setupUI(){
     app.stage.addChild(p2ScoreTxt);
 }
 
-function createBall(){
-    bgSprite = new PIXI.Sprite.from("images/Ball.png");
-    bgSprite.anchor.set(0.5);
-    bgSprite.x = app.view.width / 2;
-    bgSprite.y = (app.view.height / 2 - 100) + Math.floor(Math.random() * 200);
-    bgSprite.zIndex = 20;
-    app.stage.addChild(bgSprite);
+
+//Create a ball
+let createBall = () => {
+    ballSprite = new PIXI.Sprite.from("images/Ball.png");
+    ballSprite.anchor.set(0.5);
+    ballSprite.x = app.view.width / 2;
+    ballSprite.y = (app.view.height / 2 - 100) + Math.floor(Math.random() * 200);
+    ballSprite.zIndex = 20;
+    app.stage.addChild(ballSprite);
 }
 
-function startRound(){
+//Start a round
+let startRound = () => {
     createBall();
+    gameRunning = true;
 }
 
-function keysDown(e) {
+//Game logic
+let gameLoop = () => {
+    if (gameRunning){
+        checkPlayerInput();
+    }
+
+
+}
+
+//Keyboard Input
+
+//Update keys down
+let keysDown = (e) => {
     keys[e.keyCode] = true;
 }
 
-function keysUp(e) {
+//Update keys up
+let keysUp = (e) => {
     keys[e.keyCode] = false;
 }
 
-function gameLooop(){
-    if (keys["87"]){
-        player.y -= 5;
+//Check player controls
+let checkPlayerInput = () => {
+    //Pause - Esc
+    if (keys["27"]){
+        
     }
 
+    //P1 Up - Q
+    if (keys["81"]){
+        movePlayer(1, -1);
+    }
+
+    //P1 Down - A 
     if (keys["65"]){
-        player.x -= 5;
+        movePlayer(1, 1);
     }
 
-    if (keys["83"]){
-        player.y += 5;
+    //P1 Shoot - Space
+    if (keys["32"]){
+        
     }
 
-    if (keys["68"]){
-        player.x += 5;
+    //P1 Super - Alt
+    if (keys["18"]){
+        
+    }
+
+    //P2 Up - Up Arrow
+    if (keys["38"]){
+        movePlayer(2, -1);
+    }
+
+    //P2 Down - Down Arrow 
+    if (keys["40"]){
+        movePlayer(2, 1);
+    }
+
+    //P2 Shoot - Shift
+    if (keys["32"]){
+        
+    }
+
+    //P2 Super - Ctrl
+    if (keys["17"]){
+        
+    }    
+}
+//End Keyboard Input
+
+//Move player logic, playerToMove 1 or 2, moveDirection -1 up / 1 down 
+let movePlayer = (playerToMove, moveDirection) => {
+    let myPlayerToMove;
+    let myPlayerSpeed;
+    let targetPosition;
+
+    if (playerToMove == 1){
+        myPlayerToMove = p1;
+
+        if (p1Charge < fullPlayerCharge){
+            myPlayerSpeed = basePlayerSpeed;
+        }
+        else{
+            myPlayerSpeed = chargedPlayerSpeed;
+        }
+    }
+    else{
+        myPlayerToMove = p2;
+
+        if (p2Charge < fullPlayerCharge){
+            myPlayerSpeed = basePlayerSpeed;
+        }
+        else{
+            myPlayerSpeed = chargedPlayerSpeed;
+        }
+    }
+
+    targetPosition = Math.floor(myPlayerToMove.y + myPlayerSpeed * moveDirection * (app.ticker.deltaMS * 0.01));
+    if (moveDirection == -1){
+        if (targetPosition > playAreaOffset + paddleYGap + myPlayerToMove.height / 2 ){
+            myPlayerToMove.y = targetPosition;
+        }
+        else{
+            myPlayerToMove.y = playAreaOffset + paddleYGap + myPlayerToMove.height / 2;
+        }
+    }
+    else{
+        if (targetPosition < app.view.height - playAreaOffset - paddleYGap - myPlayerToMove.height / 2 ){
+            myPlayerToMove.y = targetPosition;
+        }
+        else{
+            myPlayerToMove.y = app.view.height - playAreaOffset - paddleYGap - myPlayerToMove.height / 2 ;
+        }
     }
 }
