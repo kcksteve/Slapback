@@ -1,7 +1,7 @@
 let app;
 
-const basePlayerSpeed = 40;
-const chargedPlayerSpeed = 60;
+const basePlayerSpeed = 50;
+const chargedPlayerSpeed = 70;
 const fullPlayerCharge = 6;
 const playAreaOffset = 20;
 const paddleYGap = 10;
@@ -10,6 +10,8 @@ const netDivBotY = 400;
 const netXoffset = 30;
 
 let p1;
+let p1MoveUp = false;
+let p1MoveDown = false;
 let p1Score;
 let p1ScoreTxt;
 let p1Speed;
@@ -19,6 +21,8 @@ let p1MidNet;
 let p1BotNet;
 
 let p2;
+let p2MoveUp = false;
+let p2MoveDown = false;
 let p2Score;
 let p2ScoreTxt;
 let p2Speed;
@@ -34,9 +38,13 @@ let ballSprite;
 let ballAngle;
 let ballState = 0;
 let ballStuck = 0;
+let ballStuckTimer = 0;
 let ballSpeedState;
-const ballSpeeds = [12, 20, 22, 30];
+const ballSpeeds = [20, 40, 50, 80];
+const ballReleaseTime = 0.7;
+const ballParryTime = 0.12;
 
+let keybListener;
 let gameRunning;
 let keys = {};
 let keysPressed = {};
@@ -55,14 +63,12 @@ window.onload = () => {
     document.body.appendChild(app.view);
 
     //SetupFunctions
+    setupControls();
     setupUI();
     setupPlayers();
     setupLevel();
     startRound();
 
-    window.addEventListener("keypress", keysPress);
-    window.addEventListener("keydown", keysDown);
-    window.addEventListener("keyup", keysUp);
     app.ticker.add(gameLoop);
 }
 
@@ -380,6 +386,8 @@ let checkBallX = (x, y) => {
 
 //Update ball based on it's state 0=NoneInPlay, 1=InPlay, 2=Scored
 let updateBall = () => {
+    updateStuckTimer();
+
     switch (ballState) {
         case 0:
             createBall();
@@ -390,6 +398,24 @@ let updateBall = () => {
         case 2:
             moveBall();
             break;
+    }
+}
+
+let updateStuckTimer = () => {
+    if (ballStuck == 0){
+        ballStuckTimer = 0;
+    }
+    else{
+        ballStuckTimer += app.ticker.deltaMS * 0.001;
+    }
+
+    if (ballStuckTimer >= ballReleaseTime){
+        if (ballStuck == 1){
+            shootPlayer(0);
+        }
+        else if (ballStuck == 2){
+            shootPlayer(180);
+        }
     }
 }
 
@@ -428,103 +454,139 @@ let playerScore = (player, ballY) => {
 //Game logic
 let gameLoop = () => {
     if (gameRunning){
-        checkPlayerInput();
+        checkPlayerMovement();
         updateBall();
     }
-
-
 }
 
 //Keyboard Input
 
-//Update keys down
-let keysPress = (e) => {
-    //P1 Shoot - X
-    console.log(e.keyCode);
-    if (e.keyCode = "120" && !e.repeat){
-        if (ballStuck == 1){
-            if (keys["81"] && !keys["65"]){
-                shootPlayer(315);
-            }
-            else if(keys["65"]&& !keys["81"]){
-                shootPlayer(45);
-            }
-            else{
-                shootPlayer(0);
-            }
+let setupControls = () =>{
+    keybListener = new window.keypress.Listener();
+    keybListener.register_many([
+        {
+            //P1 Up
+            "keys" : "w",
+            "on_keydown" : () => p1MoveUp = true,
+            "on_keyup" : () => p1MoveUp = false,
+            "prevent_repeat" : true
+        },
+        {
+            //P1 Down
+            "keys" : "s",
+            "on_keydown" : () => p1MoveDown = true,
+            "on_keyup" : () => p1MoveDown = false,
+            "prevent_repeat" : true
+        },
+        {
+            //P1 Shoot
+            "keys" : "d",
+            "on_keydown" : () => p1Shoot(),
+            "prevent_repeat" : true
+        },
+        {
+            //P1 Super
+            "keys" : "a",
+            "on_keydown" : () => p1Super(),
+            "prevent_repeat" : true
+        },
+        {
+            //P2 Up
+            "keys" : "up",
+            "on_keydown" : () => p2MoveUp = true,
+            "on_keyup" : () => p2MoveUp = false,
+            "prevent_repeat" : true
+        },
+        {
+            //P2 Down
+            "keys" : "down",
+            "on_keydown" : () => p2MoveDown = true,
+            "on_keyup" : () => p2MoveDown = false,
+            "prevent_repeat" : true
+        },
+        {
+            //P2 Shoot
+            "keys" : "left",
+            "on_keydown" : () => p2Shoot(),
+            "prevent_repeat" : true
+        },
+        {
+            //P2 Super
+            "keys" : "right",
+            "on_keydown" : () => p2Super(),
+            "prevent_repeat" : true
+        },
+        {
+            //Pause
+            "keys" : "escape",
+            "on_keydown" : () => pause(),
+            "prevent_repeat" : true
+        }
+    ]);
+}
+
+//Player action functions
+
+let p1Shoot = () => {
+    if (ballStuck == 1){
+        if (p1MoveUp && !p1MoveDown){
+            shootPlayer(315);
+        }
+        else if(!p1MoveUp && p1MoveDown){
+            shootPlayer(45);
+        }
+        else{
+            shootPlayer(0);
         }
     }
-
-    //P1 Super - C
-    if (keys["99"]){
-        
-    }
-    
-    //P2 Shoot - /
-    if (e.keyCode = "47"){
-        if (ballStuck == 2){
-            if (keys["38"] && !keys["40"]){
-                shootPlayer(225);
-            }
-            else if(keys["40"]&& !keys["38"]){
-                shootPlayer(135);
-            }
-            else{
-                shootPlayer(180);
-            }
-        }
-    }
-
-    //P2 Super - .
-    if (keys["47"]){
-        
-    }    
 } 
- 
-let keysDown = (e) => {
-    keys[e.keyCode] = true;
+
+let p1Super = () => {
+    console.log("super!")
+} 
+
+let p2Shoot = () => {
+    if (ballStuck == 2){
+        if (p2MoveUp && !p2MoveDown){
+            shootPlayer(225);
+        }
+        else if(!p2MoveUp && p2MoveDown){
+            shootPlayer(135);
+        }
+        else{
+            shootPlayer(180);
+        }
+    }
+} 
+
+let p2Super = () => {
+    console.log("super!")
+} 
+
+let pause = () => {
+    console.log("pause");
 }
 
-//Update keys up
-let keysUp = (e) => {
-    keys[e.keyCode] = false;
-}
-
-//Check player controls
-let checkPlayerInput = () => {
-    //Pause - Esc
-    if (keys["27"]){
-        
+//Check player movement variables
+let checkPlayerMovement = () => {
+    //P1 Up
+    if (p1MoveUp && !p1MoveDown && ballStuck != 1){
+        movePlayer(1, -1);
     }
 
-    //P1 Up - Q
-    if (keys["81"] && !keys["65"]){
-        if (ballStuck != 1){
-            movePlayer(1, -1);
-        }
+    //P1 Down
+    if (!p1MoveUp && p1MoveDown && ballStuck != 1){
+        movePlayer(1, 1);
     }
 
-    //P1 Down - A 
-    if (keys["65"]&& !keys["81"]){
-        if (ballStuck != 1){
-            movePlayer(1, 1);
-        }
+    //P2 Up
+    if (p2MoveUp && !p2MoveDown && ballStuck != 2){
+        movePlayer(2, -1);
     }
 
-
-
-    //P2 Up - Up Arrow
-    if (keys["38"] && !keys["40"]){
-        if (ballStuck != 2){
-            movePlayer(2, -1);
-        }
-    }
-
-    //P2 Down - Down Arrow 
-    if (keys["40"] && !keys["38"]){
-        if (ballStuck != 2){
-            movePlayer(2, 1);
-        }
+    //P2 Down
+    if (!p2MoveUp && p2MoveDown && ballStuck != 2){
+        movePlayer(2, 1);
     }
 }
 //End Keyboard Input
@@ -575,7 +637,22 @@ let movePlayer = (playerToMove, moveDirection) => {
     }
 }
 
+
 let shootPlayer = (angle) => {
     ballAngle = angle;
     ballStuck = 0;
+
+    if (ballStuckTimer <= ballParryTime){
+        if (ballSpeedState <= 1){
+            ballSpeedState += 1;
+        }
+        else {
+            ballSpeedState = 2
+        }
+    }
+    else{
+        ballSpeedState = 0;
+    }
+
+    console.log(ballSpeedState);
 }
