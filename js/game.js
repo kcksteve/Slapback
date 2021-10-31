@@ -35,6 +35,10 @@ let p2BotNet;
 let lastPlayerScored = 0;
 
 let bgSprite;
+
+let ballHits = [];
+let ballHitLast = 0;
+let ballHitSheet = [];
 let ballSprite;
 let ballAngle;
 let ballHalo;
@@ -211,6 +215,22 @@ let setupBall = () => {
     app.stage.addChild(ballHalo);
 
     //Setup impact sprite
+    let ssheet = new PIXI.BaseTexture.from(app.loader.resources["ballhit"].url);
+    let sheetSize = ssheet.height;
+    let frames = ssheet.width / ssheet.height
+    for (i = 0; i < frames; i++){
+        ballHitSheet.push(new PIXI.Texture(ssheet, new PIXI.Rectangle(i * sheetSize, 0, sheetSize, sheetSize)));
+    }
+
+    for (i = 0; i < 4; i++){
+        ballHits.push(new PIXI.AnimatedSprite(ballHitSheet));
+        ballHits[i].anchor.set(0.5);
+        ballHits[i].x = -100;
+        ballHits[i].y = -100;
+        ballHits[i].animationSpeed = 0.25;
+        ballHits[i].loop = false;
+        app.stage.addChild(ballHits[i]);
+    }
 }
 
 //Create a ball
@@ -327,6 +347,7 @@ let checkBallY = (y) => {
         else {
             ballAngle = 45;
         }
+        setBallHit();
         return playAreaOffset + 4 + ballSprite.height / 2;
     } 
     else if (ballSprite.y + ballSprite.height / 2 >= app.view.height - playAreaOffset - 3){
@@ -336,6 +357,7 @@ let checkBallY = (y) => {
         else {
             ballAngle = 315;
         }
+        setBallHit();
         return app.view.height - playAreaOffset - 4 - ballSprite.height / 2;
     }
     else{
@@ -444,6 +466,18 @@ let updateBallHalo = () => {
         ballHalo.y = ballSprite.y;
         ballHalo.visible = true;
     }
+}
+
+let setBallHit = () => {
+    if (ballHitLast + 1 < ballHits.length){
+        ballHitLast += 1;
+    }
+    else{
+        ballHitLast = 1;
+    }
+    ballHits[ballHitLast].x = ballSprite.x;
+    ballHits[ballHitLast].y = ballSprite.y;
+    ballHits[ballHitLast].gotoAndPlay(0);
 }
 
 let updateStuckTimer = () => {
@@ -726,7 +760,7 @@ let shootPlayer = (angle, player) => {
         ballSpeedState = 0;
     }
 
-    console.log(ballSpeedState);
+    setBallHit();
 }
 
 let superShootPlayer = (angle, player) => {
