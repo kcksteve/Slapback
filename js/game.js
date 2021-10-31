@@ -9,6 +9,7 @@ const netDivTopY = 200;
 const netDivBotY = 400;
 const netXoffset = 30;
 
+//Global vars and constants
 let p1;
 let p1MoveUp = false;
 let p1MoveDown = false;
@@ -28,7 +29,7 @@ let p2ScoreTxt;
 let p2Speed;
 let p2Charge;
 let p2TopNet;
-let p2MidNet;
+let p2MidNet;   
 let p2BotNet;
 
 let lastPlayerScored = 0;
@@ -36,13 +37,14 @@ let lastPlayerScored = 0;
 let bgSprite;
 let ballSprite;
 let ballAngle;
+let ballHalo;
 let ballState = 0;
 let ballStuck = 0;
 let ballStuckTimer = 0;
 let ballSpeedState;
 const ballSpeeds = [20, 40, 50, 80];
-const ballReleaseTime = 0.7;
-const ballParryTime = 0.12;
+const ballReleaseTime = 0.9;
+const ballParryTime = 0.20;
 
 let keybListener;
 let gameRunning;
@@ -55,21 +57,40 @@ window.onload = () => {
         {
             width: 800,
             height: 600,
-            backgroundColor: 0x0D0D0D
+            backgroundColor: 0x0D0D0D,
+            roundPixels: true
         }
     );
     
     //Add pixi to body
     document.body.appendChild(app.view);
 
-    //SetupFunctions
+    //Load all images
+    loadImages();
+
+}
+
+//Setup all game elements
+let setupAll = () => {
+    setupBall();
     setupControls();
     setupUI();
     setupPlayers();
     setupLevel();
     startRound();
-
     app.ticker.add(gameLoop);
+}
+
+//Call all setups after loading images
+let loadImages = () => {
+    app.loader.add("paddle", "images/Paddle.png")
+    app.loader.add("playarea", "images/PlayArea.png")
+    app.loader.add("net", "images/Net.png")
+    app.loader.add("ballhalo", "images/BallHalo.png")
+    app.loader.add("ball", "images/Ball.png")
+    app.loader.add("ballhit", "images/BallHit.png")
+
+    app.loader.load(setupAll);
 }
 
 //Setup player paddles and data
@@ -77,7 +98,7 @@ let setupPlayers = () => {
     const offsetFromEdge = 56;
 
     //Setup player 1
-    p1 = new PIXI.Sprite.from("images/Paddle.png");
+    p1 = new PIXI.Sprite.from(app.loader.resources["paddle"].url);
     p1.anchor.set(0.5);
     p1.x = p1.width / 2 + offsetFromEdge;
     p1.y = app.view.height / 2;
@@ -87,7 +108,7 @@ let setupPlayers = () => {
     p1Charge = 0;
 
     //Setup player 2
-    p2 = new PIXI.Sprite.from("images/Paddle.png");
+    p2 = new PIXI.Sprite.from(app.loader.resources["paddle"].url);
     p2.anchor.set(0.5);
     p2.x = app.view.width - offsetFromEdge + p2.width / 2;
     p2.y = app.view.height / 2;
@@ -99,7 +120,7 @@ let setupPlayers = () => {
 
 //Setup play area
 let setupLevel = () => {
-    bgSprite = new PIXI.Sprite.from("images/PlayArea.png");
+    bgSprite = new PIXI.Sprite.from(app.loader.resources["playarea"].url);
     bgSprite.anchor.set(0.5);
     bgSprite.x = app.view.width / 2;
     bgSprite.y = app.view.height / 2;
@@ -109,42 +130,42 @@ let setupLevel = () => {
     const netTopY = 114;
     const netBotY = 486;
 
-    p1TopNet = new PIXI.Sprite.from("images/Net.png");
+    p1TopNet = new PIXI.Sprite.from(app.loader.resources["net"].url);
     p1TopNet.anchor.set(0.5);
     p1TopNet.x = netXoffset;
     p1TopNet.y = netTopY;
     p1TopNet.zIndex = 0;
     app.stage.addChild(p1TopNet);
 
-    p1MidNet = new PIXI.Sprite.from("images/Net.png");
+    p1MidNet = new PIXI.Sprite.from(app.loader.resources["net"].url);
     p1MidNet.anchor.set(0.5);
     p1MidNet.x = netXoffset;
     p1MidNet.y = app.view.height / 2;
     p1MidNet.zIndex = 0;
     app.stage.addChild(p1MidNet);
 
-    p1BotNet = new PIXI.Sprite.from("images/Net.png");
+    p1BotNet = new PIXI.Sprite.from(app.loader.resources["net"].url);
     p1BotNet.anchor.set(0.5);
     p1BotNet.x = netXoffset;
     p1BotNet.y = netBotY;
     p1BotNet.zIndex = 0;
     app.stage.addChild(p1BotNet);
 
-    p2TopNet = new PIXI.Sprite.from("images/Net.png");
+    p2TopNet = new PIXI.Sprite.from(app.loader.resources["net"].url);
     p2TopNet.anchor.set(0.5);
     p2TopNet.x = app.view.width - netXoffset;
     p2TopNet.y = netTopY;
     p2TopNet.zIndex = 0;
     app.stage.addChild(p2TopNet);
 
-    p2MidNet = new PIXI.Sprite.from("images/Net.png");
+    p2MidNet = new PIXI.Sprite.from(app.loader.resources["net"].url);
     p2MidNet.anchor.set(0.5);
     p2MidNet.x = app.view.width - netXoffset;
     p2MidNet.y = app.view.height / 2;
     p2MidNet.zIndex = 0;
     app.stage.addChild(p2MidNet);
 
-    p2BotNet = new PIXI.Sprite.from("images/Net.png");
+    p2BotNet = new PIXI.Sprite.from(app.loader.resources["net"].url);
     p2BotNet.anchor.set(0.5);
     p2BotNet.x = app.view.width - netXoffset;
     p2BotNet.y = netBotY;
@@ -152,7 +173,7 @@ let setupLevel = () => {
     app.stage.addChild(p2BotNet);
 }
 
-//Setup game playe ui
+//Setup game player ui
 let setupUI = () => {
     const scoreTxtXOffset = 10;
     const scoreTxtY = 100;
@@ -180,6 +201,17 @@ let setupUI = () => {
     app.stage.addChild(p2ScoreTxt);
 }
 
+//Setup ball
+let setupBall = () => {
+    //Setup ball halo sprite
+    ballHalo = new PIXI.Sprite.from(app.loader.resources["ballhalo"].url);
+    ballHalo.x = -100
+    ballHalo.y = -100;
+    ballHalo.anchor.set(0.5);
+    app.stage.addChild(ballHalo);
+
+    //Setup impact sprite
+}
 
 //Create a ball
 let createBall = () => {
@@ -187,7 +219,7 @@ let createBall = () => {
         ballSprite.destroy();
     }
 
-    ballSprite = new PIXI.Sprite.from("images/Ball.png");
+    ballSprite = new PIXI.Sprite.from(app.loader.resources["ball"].url);
     ballSprite.anchor.set(0.5);
     ballSprite.x = app.view.width / 2;
     ballSprite.y = (app.view.height / 2 - 100) + Math.floor(Math.random() * 200);
@@ -244,10 +276,11 @@ let moveBall = () => {
     if (ballStuck == 0){
         let ballOffsetX;
         let ballOffsetY;
+        const straightMulti = 1.4142;
 
         switch (ballAngle) {
             case 0:
-                ballOffsetX = ballSpeeds[ballSpeedState];
+                ballOffsetX = ballSpeeds[ballSpeedState] * straightMulti;
                 ballOffsetY = 0;
                 break;
             case 45:
@@ -259,7 +292,7 @@ let moveBall = () => {
                 ballOffsetY = ballSpeeds[ballSpeedState];
                 break;
             case 180:
-                ballOffsetX = ballSpeeds[ballSpeedState] * -1;
+                ballOffsetX = ballSpeeds[ballSpeedState] * -1 * straightMulti;
                 ballOffsetY = 0;
                 break;
             case 225:
@@ -387,6 +420,7 @@ let checkBallX = (x, y) => {
 //Update ball based on it's state 0=NoneInPlay, 1=InPlay, 2=Scored
 let updateBall = () => {
     updateStuckTimer();
+    updateBallHalo();
 
     switch (ballState) {
         case 0:
@@ -398,6 +432,17 @@ let updateBall = () => {
         case 2:
             moveBall();
             break;
+    }
+}
+
+let updateBallHalo = () => {
+    if (ballStuck == 0){
+        ballHalo.visible = false;
+    }
+    else{
+        ballHalo.x = ballSprite.x;
+        ballHalo.y = ballSprite.y;
+        ballHalo.visible = true;
     }
 }
 
@@ -530,37 +575,57 @@ let setupControls = () =>{
 let p1Shoot = () => {
     if (ballStuck == 1){
         if (p1MoveUp && !p1MoveDown){
-            shootPlayer(315);
+            shootPlayer(315, 1);
         }
         else if(!p1MoveUp && p1MoveDown){
-            shootPlayer(45);
+            shootPlayer(45, 1);
         }
         else{
-            shootPlayer(0);
+            shootPlayer(0, 1);
         }
     }
 } 
 
 let p1Super = () => {
-    console.log("super!")
+    if (ballStuck == 1 && p1Charge >= fullPlayerCharge){
+        if (p1MoveUp && !p1MoveDown){
+            superShootPlayer(315, 1);
+        }
+        else if(!p1MoveUp && p1MoveDown){
+            superShootPlayer(45, 1);
+        }
+        else{
+            superShootPlayer(0, 1);
+        }
+    }
 } 
 
 let p2Shoot = () => {
     if (ballStuck == 2){
         if (p2MoveUp && !p2MoveDown){
-            shootPlayer(225);
+            shootPlayer(225, 2);
         }
         else if(!p2MoveUp && p2MoveDown){
-            shootPlayer(135);
+            shootPlayer(135, 2);
         }
         else{
-            shootPlayer(180);
+            shootPlayer(180, 2);
         }
     }
 } 
 
 let p2Super = () => {
-    console.log("super!")
+    if (ballStuck == 2 && p2Charge >= fullPlayerCharge){
+        if (p2MoveUp && !p2MoveDown){
+            superShootPlayer(225, 2);
+        }
+        else if(!p2MoveUp && p2MoveDown){
+            superShootPlayer(135, 2);
+        }
+        else{
+            superShootPlayer(180, 2);
+        }
+    }
 } 
 
 let pause = () => {
@@ -638,7 +703,7 @@ let movePlayer = (playerToMove, moveDirection) => {
 }
 
 
-let shootPlayer = (angle) => {
+let shootPlayer = (angle, player) => {
     ballAngle = angle;
     ballStuck = 0;
 
@@ -649,10 +714,30 @@ let shootPlayer = (angle) => {
         else {
             ballSpeedState = 2
         }
+
+        if (player == 1){
+            p1Charge += 1;
+        }
+        else{
+            p2Charge += 1;
+        }
     }
     else{
         ballSpeedState = 0;
     }
 
     console.log(ballSpeedState);
+}
+
+let superShootPlayer = (angle, player) => {
+    if (player == 1){
+        p1Charge = 0;
+    }
+    else{
+        p2Charge = 0;
+    }
+
+    ballAngle = angle;
+    ballStuck = 0;
+    ballSpeedState = 3;
 }
