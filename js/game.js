@@ -1,3 +1,5 @@
+//const { Howl } = require("js/howler");
+
 let app;
 
 const basePlayerSpeed = 50;
@@ -36,6 +38,8 @@ let lastPlayerScored = 0;
 
 let bgSprite;
 
+let ballExplode;
+let ballExplodeSheet = [];
 let ballHits = [];
 let ballHitLast = 0;
 let ballHitSheet = [];
@@ -46,9 +50,17 @@ let ballState = 0;
 let ballStuck = 0;
 let ballStuckTimer = 0;
 let ballSpeedState;
+let ballSpawnTimer = 0;
+const ballSpawnTime = 1.2;
 const ballSpeeds = [20, 40, 50, 80];
+const ballSpeedsSfxRates = [1, 1.1, 1.2, 1.3];
 const ballReleaseTime = 0.9;
 const ballParryTime = 0.20;
+
+let sfxBounce;
+let sfxPoint;
+let sfxSuper;
+let sfxBallDestroy;
 
 let keybListener;
 let gameRunning;
@@ -70,7 +82,7 @@ window.onload = () => {
     document.body.appendChild(app.view);
 
     //Load all images
-    loadImages();
+    preloadAssets();
 
 }
 
@@ -81,20 +93,45 @@ let setupAll = () => {
     setupUI();
     setupPlayers();
     setupLevel();
+    setupAudio();
     startRound();
     app.ticker.add(gameLoop);
 }
 
 //Call all setups after loading images
-let loadImages = () => {
+let preloadAssets = () => {
     app.loader.add("paddle", "images/Paddle.png")
     app.loader.add("playarea", "images/PlayArea.png")
     app.loader.add("net", "images/Net.png")
     app.loader.add("ballhalo", "images/BallHalo.png")
     app.loader.add("ball", "images/Ball.png")
     app.loader.add("ballhit", "images/BallHit.png")
+    app.loader.add("ballexplode", "images/BallExplode.png")
+    app.loader.add("sfxBounce", "audio/bounce.mp3")
+    app.loader.add("sfxPoint", "audio/point.mp3")
+    app.loader.add("sfxBallDestroy", "audio/balldestroy.mp3")
+    app.loader.add("sfxSuper", "audio/super.mp3")
+
 
     app.loader.load(setupAll);
+}
+
+let setupAudio = () => {
+    sfxBounce = new Howl({
+        src: [app.loader.resources["sfxBounce"].url]
+    })
+
+    sfxPoint = new Howl({
+        src: [app.loader.resources["sfxPoint"].url]
+    })
+
+    sfxBallDestroy = new Howl({
+        src: [app.loader.resources["sfxBallDestroy"].url]
+    })
+
+    sfxSuper = new Howl({
+        src: [app.loader.resources["sfxSuper"].url]
+    })
 }
 
 //Setup player paddles and data
@@ -231,6 +268,22 @@ let setupBall = () => {
         ballHits[i].loop = false;
         app.stage.addChild(ballHits[i]);
     }
+
+    //Setup explode sprite
+    let ssheet2 = new PIXI.BaseTexture.from(app.loader.resources["ballexplode"].url);
+    let sheet2Size = ssheet2.height;
+    let frames2 = ssheet2.width / ssheet2.height
+    for (i = 0; i < frames2; i++){
+        ballExplodeSheet.push(new PIXI.Texture(ssheet2, new PIXI.Rectangle(i * sheet2Size, 0, sheet2Size, sheet2Size)));
+    }
+
+    ballExplode = new PIXI.AnimatedSprite(ballExplodeSheet);
+    ballExplode.anchor.set(0.5);
+    ballExplode.x = -100;
+    ballExplode.y = -100;
+    ballExplode.animationSpeed = 0.25;
+    ballExplode.loop = false;
+    app.stage.addChild(ballExplode);
 }
 
 //Create a ball
@@ -348,6 +401,7 @@ let checkBallY = (y) => {
             ballAngle = 45;
         }
         setBallHit();
+        playSfxBounce();
         return playAreaOffset + 4 + ballSprite.height / 2;
     } 
     else if (ballSprite.y + ballSprite.height / 2 >= app.view.height - playAreaOffset - 3){
@@ -358,6 +412,7 @@ let checkBallY = (y) => {
             ballAngle = 315;
         }
         setBallHit();
+        playSfxBounce();
         return app.view.height - playAreaOffset - 4 - ballSprite.height / 2;
     }
     else{
@@ -404,6 +459,7 @@ let checkBallX = (x, y) => {
             else{
                 return x;
             }
+            
         }
     }
 
@@ -422,11 +478,11 @@ let checkBallX = (x, y) => {
         }
         else{
             if (paddleIsPlayer == 1 && x <= netXoffset){
-                playerScore(2, ballSprite.y);
+                playerScore(2, ballSprite.x, ballSprite.y);
                 return x;
             }
             else if(paddleIsPlayer == 2 && x >= app.view.width - netXoffset){
-                playerScore(1, ballSprite.y);
+                playerScore(1, ballSprite.x, ballSprite.y);
                 return x;
             }
             else{
@@ -446,7 +502,13 @@ let updateBall = () => {
 
     switch (ballState) {
         case 0:
-            createBall();
+                if (ballSpawnTimer <= ballSpawnTime){
+                    ballSpawnTimer += app.ticker.deltaMS * 0.001;
+                }
+                else{
+                    ballSpawnTimer = 0;
+                    createBall();
+                }
             break;
         case 1:
             moveBall();
@@ -503,10 +565,16 @@ let startRound = () => {
     gameRunning = true;
 }
 
-let playerScore = (player, ballY) => {
+let playerScore = (player, ballX, ballY) => {
     const pointsTopBot = 1;
     const pointsMid = 2;
     let pointsToAward;
+
+    ballExplode.x = ballX;
+    ballExplode.y = ballY;
+    ballExplode.gotoAndPlay(0);
+
+    sfxBallDestroy.play();
 
     if (ballY > netDivTopY && ballY < netDivBotY) {
         pointsToAward = pointsMid;
@@ -515,16 +583,21 @@ let playerScore = (player, ballY) => {
         pointsToAward = pointsTopBot;
     }
 
-    if (player == 1){
-        p1Score += pointsToAward;
-        p1ScoreTxt.text = p1Score;
-        lastPlayerScored = 1
+    applyScore = () =>{
+        if (player == 1){
+            p1Score += pointsToAward;
+            p1ScoreTxt.text = p1Score;
+            lastPlayerScored = 1
+        }
+        else{
+            p2Score += pointsToAward;
+            p2ScoreTxt.text = p2Score;
+            lastPlayerScored = 2
+        }
+        sfxPoint.play();
     }
-    else{
-        p2Score += pointsToAward;
-        p2ScoreTxt.text = p2Score;
-        lastPlayerScored = 2
-    }
+
+    setTimeout(applyScore, 300)
 
     ballState = 0;
     ballSprite.visible = false;
@@ -761,6 +834,7 @@ let shootPlayer = (angle, player) => {
     }
 
     setBallHit();
+    playSfxBounce();
 }
 
 let superShootPlayer = (angle, player) => {
@@ -773,5 +847,11 @@ let superShootPlayer = (angle, player) => {
 
     ballAngle = angle;
     ballStuck = 0;
-    ballSpeedState = 3;
+    ballSpeedState = ballSpeeds.length - 1;
+    sfxSuper.play();
+}
+
+let playSfxBounce = () => {
+    sfxBounce.rate(ballSpeedsSfxRates[ballSpeedState]);
+    sfxBounce.play();
 }
