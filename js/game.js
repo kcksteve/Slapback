@@ -13,6 +13,7 @@ const netXoffset = 30;
 
 //Global vars and constants
 let p1;
+let p1Indicator;
 let p1MoveUp = false;
 let p1MoveDown = false;
 let p1Score;
@@ -24,6 +25,7 @@ let p1MidNet;
 let p1BotNet;
 
 let p2;
+let p2Indicator;
 let p2MoveUp = false;
 let p2MoveDown = false;
 let p2Score;
@@ -81,9 +83,8 @@ window.onload = () => {
     //Add pixi to body
     document.body.appendChild(app.view);
 
-    //Load all images
+    //Load all images and audio
     preloadAssets();
-
 }
 
 //Setup all game elements
@@ -101,6 +102,7 @@ let setupAll = () => {
 //Call all setups after loading images
 let preloadAssets = () => {
     app.loader.add("paddle", "images/Paddle.png")
+    app.loader.add("paddleIndicator", "images/PaddleIndicator.png")
     app.loader.add("playarea", "images/PlayArea.png")
     app.loader.add("net", "images/Net.png")
     app.loader.add("ballhalo", "images/BallHalo.png")
@@ -111,7 +113,7 @@ let preloadAssets = () => {
     app.loader.add("sfxPoint", "audio/point.mp3")
     app.loader.add("sfxBallDestroy", "audio/balldestroy.mp3")
     app.loader.add("sfxSuper", "audio/super.mp3")
-
+    app.loader.add("sfxPlayerMiss", "audio/playermiss.mp3")
 
     app.loader.load(setupAll);
 }
@@ -132,29 +134,50 @@ let setupAudio = () => {
     sfxSuper = new Howl({
         src: [app.loader.resources["sfxSuper"].url]
     })
+
+    sfxPlayerMiss = new Howl({
+        src: [app.loader.resources["sfxPlayerMiss"].url]
+    })
 }
 
 //Setup player paddles and data
 let setupPlayers = () => {
-    const offsetFromEdge = 56;
+    const offsetFromEdge = 64;
+    const indicatorOffset = 10;
 
     //Setup player 1
+    //p1 paddle
     p1 = new PIXI.Sprite.from(app.loader.resources["paddle"].url);
     p1.anchor.set(0.5);
     p1.x = p1.width / 2 + offsetFromEdge;
     p1.y = app.view.height / 2;
     p1.zIndex = 11;
     app.stage.addChild(p1);
+    //p1 paddle indicator
+    p1Indicator = new PIXI.Sprite.from(app.loader.resources["paddleIndicator"].url);
+    p1Indicator.anchor.set(0.5);
+    p1Indicator.x = indicatorOffset * -1;
+    p1Indicator.height = 0;
+    p1.addChild(p1Indicator);
+    //Set var defaults
     p1Score = 0;
     p1Charge = 0;
 
     //Setup player 2
+    //p2 paddle
     p2 = new PIXI.Sprite.from(app.loader.resources["paddle"].url);
     p2.anchor.set(0.5);
     p2.x = app.view.width - offsetFromEdge + p2.width / 2;
     p2.y = app.view.height / 2;
     p2.zIndex = 10;
     app.stage.addChild(p2);
+    //p2 paddle indicator
+    p2Indicator = new PIXI.Sprite.from(app.loader.resources["paddleIndicator"].url);
+    p2Indicator.anchor.set(0.5);
+    p2Indicator.x = indicatorOffset;
+    p2Indicator.height = 0;
+    p2.addChild(p2Indicator);
+    //Set var defaults
     p2Score = 0;
     p2Charge = 0;
 }
@@ -607,6 +630,7 @@ let playerScore = (player, ballX, ballY) => {
 let gameLoop = () => {
     if (gameRunning){
         checkPlayerMovement();
+        updatePlayerIndicators();
         updateBall();
     }
 }
@@ -691,6 +715,9 @@ let p1Shoot = () => {
             shootPlayer(0, 1);
         }
     }
+    else{
+        sfxPlayerMiss.play();
+    }
 } 
 
 let p1Super = () => {
@@ -719,6 +746,9 @@ let p2Shoot = () => {
             shootPlayer(180, 2);
         }
     }
+    else{
+        sfxPlayerMiss.play();
+    }
 } 
 
 let p2Super = () => {
@@ -737,6 +767,12 @@ let p2Super = () => {
 
 let pause = () => {
     console.log("pause");
+}
+
+//Update size of player indicators
+let updatePlayerIndicators = () => {
+    p1Indicator.height = (p1Charge / fullPlayerCharge) * p1.height;
+    p2Indicator.height = (p2Charge / fullPlayerCharge) * p2.height;
 }
 
 //Check player movement variables
@@ -822,10 +858,10 @@ let shootPlayer = (angle, player) => {
             ballSpeedState = 2
         }
 
-        if (player == 1){
+        if (player == 1 && p1Charge < fullPlayerCharge){
             p1Charge += 1;
         }
-        else{
+        else if (player == 2 && p2Charge < fullPlayerCharge){
             p2Charge += 1;
         }
     }
