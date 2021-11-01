@@ -3,7 +3,7 @@
 let app;
 
 const basePlayerSpeed = 50;
-const chargedPlayerSpeed = 70;
+const chargedPlayerSpeed = 65;
 const fullPlayerCharge = 6;
 const playAreaOffset = 20;
 const paddleYGap = 10;
@@ -45,6 +45,9 @@ let ballExplodeSheet = [];
 let ballHits = [];
 let ballHitLast = 0;
 let ballHitSheet = [];
+let ballTrail = [];
+let ballTrailLagCount = 0;
+let ballLastPositions = [];
 let ballSprite;
 let ballAngle;
 let ballHalo;
@@ -53,8 +56,9 @@ let ballStuck = 0;
 let ballStuckTimer = 0;
 let ballSpeedState;
 let ballSpawnTimer = 0;
+const ballTrailLag = 6;
 const ballSpawnTime = 1.2;
-const ballSpeeds = [20, 40, 50, 80];
+const ballSpeeds = [25, 40, 55, 90];
 const ballSpeedsSfxRates = [1, 1.1, 1.2, 1.3];
 const ballReleaseTime = 0.9;
 const ballParryTime = 0.20;
@@ -307,6 +311,22 @@ let setupBall = () => {
     ballExplode.animationSpeed = 0.25;
     ballExplode.loop = false;
     app.stage.addChild(ballExplode);
+
+    //Setup ball trail
+    let ballTrailShrink = 4; 
+    for (i = 0; i < 3; i++){
+        ballTrail[i] = new PIXI.Sprite.from(app.loader.resources["ball"].url);
+        ballTrail[i].x = -100;
+        ballTrail[i].y = -100;
+        ballTrail[i].width -= ballTrailShrink * i;
+        ballTrail[i].height -= ballTrailShrink * i;
+        ballTrail[i].anchor.set(0.5);
+        ballTrail[i].alpha = 0.15;
+        app.stage.addChild(ballTrail[i]);
+
+        ballLastPositions.push({"x": 0, "y": 0})
+    }
+    ballLastPositions.push({"x": 0, "y": 0})
 }
 
 //Create a ball
@@ -315,6 +335,7 @@ let createBall = () => {
         ballSprite.destroy();
     }
 
+    resetBallTrail();
     ballSprite = new PIXI.Sprite.from(app.loader.resources["ball"].url);
     ballSprite.anchor.set(0.5);
     ballSprite.x = app.view.width / 2;
@@ -412,6 +433,43 @@ let moveBall = () => {
         ballSprite.y = checkBallY(targetY);
     }
     
+}
+
+let updateBallTrail = () => {
+    if (ballSprite != null){
+        ballTrailLagCount += 1
+
+        if (ballTrailLagCount >= ballTrailLag){
+            ballTrailLagCount = 0;
+            ballLastPositions[3].x = ballLastPositions[2].x
+            ballLastPositions[3].y = ballLastPositions[2].y
+            ballLastPositions[2].x = ballLastPositions[1].x
+            ballLastPositions[2].y = ballLastPositions[1].y
+            ballLastPositions[1].x = ballLastPositions[0].x
+            ballLastPositions[1].y = ballLastPositions[0].y
+            ballLastPositions[0].x = ballSprite.x
+            ballLastPositions[0].y = ballSprite.y
+        
+            for (i = 0; i < 3; i++){
+                ballTrail[i].x = ballLastPositions[i + 1].x;
+                ballTrail[i].y = ballLastPositions[i + 1].y;
+            }
+
+            for (i = 0; i < 3; i++){
+                if (ballTrail[i].x == ballLastPositions[0].x && ballTrail[i].y == ballLastPositions[0].y){
+                    ballTrail[i].x = -100;
+                    ballTrail[i].y = -100;
+                }
+            }
+        }
+    }
+}
+
+let resetBallTrail = () => {
+    for (i = 0; i < 4; i++){
+        ballLastPositions[i].x = -100
+        ballLastPositions[i].y = -100
+    }
 }
 
 //Check ball location for bounce
@@ -522,6 +580,7 @@ let checkBallX = (x, y) => {
 let updateBall = () => {
     updateStuckTimer();
     updateBallHalo();
+    updateBallTrail();
 
     switch (ballState) {
         case 0:
@@ -535,11 +594,14 @@ let updateBall = () => {
             break;
         case 1:
             moveBall();
+            //updateBallTrail();
             break;
         case 2:
             moveBall();
+            //updateBallTrail();
             break;
     }
+
 }
 
 let updateBallHalo = () => {
