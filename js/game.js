@@ -1,5 +1,3 @@
-//const { Howl } = require("js/howler");
-
 let app;
 
 const basePlayerSpeed = 50;
@@ -123,24 +121,32 @@ let preloadAssets = () => {
 }
 
 let setupAudio = () => {
+    volumeAll = 0.15;
+
     sfxBounce = new Howl({
-        src: [app.loader.resources["sfxBounce"].url]
+        src: [app.loader.resources["sfxBounce"].url],
+        volume: volumeAll
     })
 
+
     sfxPoint = new Howl({
-        src: [app.loader.resources["sfxPoint"].url]
+        src: [app.loader.resources["sfxPoint"].url],
+        volume: volumeAll
     })
 
     sfxBallDestroy = new Howl({
-        src: [app.loader.resources["sfxBallDestroy"].url]
+        src: [app.loader.resources["sfxBallDestroy"].url],
+        volume: volumeAll
     })
 
     sfxSuper = new Howl({
-        src: [app.loader.resources["sfxSuper"].url]
+        src: [app.loader.resources["sfxSuper"].url],
+        volume: volumeAll
     })
 
     sfxPlayerMiss = new Howl({
-        src: [app.loader.resources["sfxPlayerMiss"].url]
+        src: [app.loader.resources["sfxPlayerMiss"].url],
+        volume: volumeAll
     })
 }
 
@@ -393,6 +399,7 @@ let moveBall = () => {
     if (ballStuck == 0){
         let ballOffsetX;
         let ballOffsetY;
+        let steppedLoc = {};
         const straightMulti = 1.4142;
 
         switch (ballAngle) {
@@ -428,11 +435,101 @@ let moveBall = () => {
 
         targetX = ballSprite.x + ballOffsetX * (app.ticker.deltaMS * 0.01);
         targetY = ballSprite.y + ballOffsetY * (app.ticker.deltaMS * 0.01);
-
-        ballSprite.x = checkBallX(targetX, targetY);
-        ballSprite.y = checkBallY(targetY);
+        steppedLoc = checkBallStep(targetX, targetY);
+        ballSprite.x = steppedLoc.x;
+        ballSprite.y = steppedLoc.y;
     }
     
+}
+
+let checkBallStep = (stepX, stepY) => {
+    //Setup
+    let ballTop;
+    let ballBot;
+    let paddleToCheck; 
+    let paddleIsPlayer;
+    let paddleFaceX;
+    let ballLocToStick;
+    let paddleTop;
+    let paddleBot;
+    let returnY;
+    let returnX;
+
+    if (ballAngle == 135 || ballAngle == 180 || ballAngle == 225){
+        paddleToCheck = p1;
+        paddleIsPlayer = 1;
+        paddleFaceX = p1.x + p1.width / 2;
+        ballLocToStick = paddleFaceX + (ballSprite.width / 2);
+    }
+    else{
+        paddleToCheck = p2;
+        paddleIsPlayer = 2;
+        paddleFaceX = p2.x - p2.width / 2;
+        ballLocToStick = paddleFaceX - (ballSprite.width / 2);
+    }
+
+    paddleTop = paddleToCheck.y - paddleToCheck.height / 2;
+    paddleBot = paddleToCheck.y + paddleToCheck.height / 2;
+
+    //Check Y
+    if (stepY - ballSprite.height / 2 <= playAreaOffset + 3){
+        if (ballAngle == 225){
+            ballAngle = 135;
+        }
+        else {
+            ballAngle = 45;
+        }
+        setBallHit();
+        playSfxBounce();
+        returnY = playAreaOffset + 4 + ballSprite.height / 2;
+    } 
+    else if (stepY + ballSprite.height / 2 >= app.view.height - playAreaOffset - 3){
+        if (ballAngle == 135){
+            ballAngle = 225;
+        }
+        else {
+            ballAngle = 315;
+        }
+        setBallHit();
+        playSfxBounce();
+        returnY = app.view.height - playAreaOffset - 14 - ballSprite.height / 2;
+    }
+    else{
+        returnY = stepY;
+    }
+
+    ballTop = returnY - ballSprite.height / 2;
+    ballBot = returnY + ballSprite.height / 2;
+
+    //Check X
+    if ((ballBot > paddleTop && ballBot < paddleBot) || (ballTop < paddleTop && ballTop > paddleBot)){
+        if (ballState == 1){
+            if (paddleIsPlayer == 1 && stepX - ballSprite.width / 2 <= paddleFaceX){
+                ballStuck = paddleIsPlayer;
+                returnX = ballLocToStick;
+            }
+            else if(paddleIsPlayer == 2 && stepX + ballSprite.width / 2 >= paddleFaceX){
+                ballStuck = paddleIsPlayer;
+                returnX = ballLocToStick;
+            }
+            else{
+                returnX = stepX;
+            }
+        }
+    }
+    else {
+        if (paddleIsPlayer == 1 && stepX - ballSprite.width / 2 <= netXoffset){
+            ballState = 2;
+            playerScore(2, stepX, returnY);
+        }
+        else if(paddleIsPlayer == 2 && stepX + ballSprite.width / 2 >= app.view.width - netXoffset){
+            ballState = 2;
+            playerScore(1, stepX, returnY);
+        }
+        returnX = stepX;
+    }
+
+    return {"x": returnX, "y": returnY};
 }
 
 let updateBallTrail = () => {
@@ -472,110 +569,6 @@ let resetBallTrail = () => {
     }
 }
 
-//Check ball location for bounce
-let checkBallY = (y) => {
-    if (ballSprite.y - ballSprite.height / 2 <= playAreaOffset + 3){
-        if (ballAngle == 225){
-            ballAngle = 135;
-        }
-        else {
-            ballAngle = 45;
-        }
-        setBallHit();
-        playSfxBounce();
-        return playAreaOffset + 4 + ballSprite.height / 2;
-    } 
-    else if (ballSprite.y + ballSprite.height / 2 >= app.view.height - playAreaOffset - 3){
-        if (ballAngle == 135){
-            ballAngle = 225;
-        }
-        else {
-            ballAngle = 315;
-        }
-        setBallHit();
-        playSfxBounce();
-        return app.view.height - playAreaOffset - 4 - ballSprite.height / 2;
-    }
-    else{
-        return y;
-    }
-}
-
-//Check ball location for stick or score
-let checkBallX = (x, y) => {
-    let ballTop = y - ballSprite.height / 2;
-    let ballBot = y + ballSprite.height / 2;
-    let paddleToCheck; 
-    let paddleIsPlayer;
-    let paddleFaceX;
-    let ballLocToStick;
-
-
-    if (ballAngle == 135 || ballAngle == 180 || ballAngle == 225){
-        paddleToCheck = p1;
-        paddleIsPlayer = 1;
-        paddleFaceX = p1.x + p1.width / 2;
-        ballLocToStick = (p1.x + p2.width / 2) + (ballSprite.width / 2);
-    }
-    else{
-        paddleToCheck = p2;
-        paddleIsPlayer = 2;
-        paddleFaceX = p2.x - p2.width / 2;
-        ballLocToStick = (p2.x - p2.width / 2) - (ballSprite.width / 2);
-    }
-
-    let paddleTop = paddleToCheck.y - paddleToCheck.height / 2;
-    let paddleBot = paddleToCheck.y + paddleToCheck.height / 2;
-
-    if ((ballBot > paddleTop && ballBot < paddleBot) || (ballTop < paddleTop && ballTop > paddleBot)){
-        if (ballState == 1){
-            if (paddleIsPlayer == 1 && x - ballSprite.width / 2 <= paddleFaceX){
-                ballStuck = paddleIsPlayer;
-                return ballLocToStick;
-            }
-            else if(paddleIsPlayer == 2 && x + ballSprite.width / 2 >= paddleFaceX){
-                ballStuck = paddleIsPlayer;
-                return ballLocToStick;
-            }
-            else{
-                return x;
-            }
-            
-        }
-    }
-
-        if (ballState == 1){
-            if (paddleIsPlayer == 1 && x - ballSprite.width / 2 <= paddleFaceX){
-                ballState = 2;
-                return x;
-            }
-            else if(paddleIsPlayer == 2 && x + ballSprite.width / 2 >= paddleFaceX){
-                ballState = 2;
-                return x;
-            }
-            else{
-                return x;
-            }
-        }
-        else{
-            if (paddleIsPlayer == 1 && x <= netXoffset){
-                playerScore(2, ballSprite.x, ballSprite.y);
-                return x;
-            }
-            else if(paddleIsPlayer == 2 && x >= app.view.width - netXoffset){
-                playerScore(1, ballSprite.x, ballSprite.y);
-                return x;
-            }
-            else{
-                return x;
-            }
-        }
-
-
-
-
-}
-
 //Update ball based on it's state 0=NoneInPlay, 1=InPlay, 2=Scored
 let updateBall = () => {
     updateStuckTimer();
@@ -594,11 +587,9 @@ let updateBall = () => {
             break;
         case 1:
             moveBall();
-            //updateBallTrail();
             break;
         case 2:
             moveBall();
-            //updateBallTrail();
             break;
     }
 
@@ -654,7 +645,6 @@ let playerScore = (player, ballX, ballY) => {
     const pointsTopBot = 1;
     const pointsMid = 2;
     let pointsToAward;
-
     ballExplode.x = ballX;
     ballExplode.y = ballY;
     ballExplode.gotoAndPlay(0);
