@@ -1,15 +1,17 @@
+//Global vars and constants
 let app;
 
-const basePlayerSpeed = 50;
+const basePlayerSpeed = 42;
 const chargedPlayerSpeed = 65;
 const fullPlayerCharge = 6;
 const playAreaOffset = 20;
+const roundTimeLimit = 100;
+const scoreToWinDefault = 7;
 const paddleYGap = 10;
 const netDivTopY = 200;
 const netDivBotY = 400;
 const netXoffset = 30;
 
-//Global vars and constants
 let p1;
 let p1Indicator;
 let p1MoveUp = false;
@@ -34,9 +36,15 @@ let p2TopNet;
 let p2MidNet;   
 let p2BotNet;
 
+let isPaused = false;
+let isOvertime = false;
+let scoreToWin = 7;
 let lastPlayerScored = 0;
-
+let roundTimeElapsed = 0;
+let timerBarFlashTimer = 0;
 let bgSprite;
+let timerBars = [];
+let winnerText;
 
 let ballExplode;
 let ballExplodeSheet = [];
@@ -56,7 +64,7 @@ let ballSpeedState;
 let ballSpawnTimer = 0;
 const ballTrailLag = 6;
 const ballSpawnTime = 1.2;
-const ballSpeeds = [25, 40, 55, 90];
+const ballSpeeds = [35, 50, 65, 90];
 const ballSpeedsSfxRates = [1, 1.1, 1.2, 1.3];
 const ballReleaseTime = 0.9;
 const ballParryTime = 0.20;
@@ -66,6 +74,7 @@ let sfxPoint;
 let sfxSuper;
 let sfxBallDestroy;
 
+let isGameOver;
 let keybListener;
 let gameRunning;
 let keys = {};
@@ -93,9 +102,9 @@ window.onload = () => {
 let setupAll = () => {
     setupBall();
     setupControls();
-    setupUI();
     setupPlayers();
     setupLevel();
+    setupUI();
     setupAudio();
     startRound();
     app.ticker.add(gameLoop);
@@ -111,11 +120,13 @@ let preloadAssets = () => {
     app.loader.add("ball", "images/Ball.png")
     app.loader.add("ballhit", "images/BallHit.png")
     app.loader.add("ballexplode", "images/BallExplode.png")
+    app.loader.add("timerbar", "images/TimerBar.png")
     app.loader.add("sfxBounce", "audio/bounce.mp3")
     app.loader.add("sfxPoint", "audio/point.mp3")
     app.loader.add("sfxBallDestroy", "audio/balldestroy.mp3")
     app.loader.add("sfxSuper", "audio/super.mp3")
     app.loader.add("sfxPlayerMiss", "audio/playermiss.mp3")
+    app.loader.add("sfxBallHitNet", "audio/ballhitnet.mp3")
 
     app.loader.load(setupAll);
 }
@@ -127,7 +138,6 @@ let setupAudio = () => {
         src: [app.loader.resources["sfxBounce"].url],
         volume: volumeAll
     })
-
 
     sfxPoint = new Howl({
         src: [app.loader.resources["sfxPoint"].url],
@@ -146,6 +156,11 @@ let setupAudio = () => {
 
     sfxPlayerMiss = new Howl({
         src: [app.loader.resources["sfxPlayerMiss"].url],
+        volume: volumeAll
+    })
+
+    sfxBallHitNet = new Howl({
+        src: [app.loader.resources["sfxBallHitNet"].url],
         volume: volumeAll
     })
 }
@@ -273,6 +288,30 @@ let setupUI = () => {
     p2ScoreTxt.anchor.y = 1;
     p2ScoreTxt.style = scoreTxtStyle;
     app.stage.addChild(p2ScoreTxt);
+
+    //Setup winner text
+    winnerText = new PIXI.Text("WINNER P0");
+    winnerText.x = app.view.width / 2;
+    winnerText.y = app.view.height / 2;
+    winnerText.anchor.set(0.5);
+    winnerText.style = scoreTxtStyle;
+    winnerText.visible = false;
+    app.stage.addChild(winnerText);
+
+    //Setup timer bars
+    const timerBarGap = 4;
+    //Top timer bar
+    timerBars[0] = new PIXI.Sprite.from(app.loader.resources["timerbar"].url);
+    timerBars[0].anchor.set(0.5);
+    timerBars[0].x = app.view.width / 2;
+    timerBars[0].y = app.view.height / 2 - bgSprite.height / 2 - timerBarGap; 
+    app.stage.addChild(timerBars[0]);
+    //Bottom timer bar
+    timerBars[1] = new PIXI.Sprite.from(app.loader.resources["timerbar"].url);
+    timerBars[1].anchor.set(0.5);
+    timerBars[1].x = app.view.width / 2;
+    timerBars[1].y = app.view.height / 2 + bgSprite.height / 2 + timerBarGap; 
+    app.stage.addChild(timerBars[1]);
 }
 
 //Setup ball
@@ -518,18 +557,113 @@ let checkBallStep = (stepX, stepY) => {
         }
     }
     else {
+        //Return true if should bounce
+        let netCheck= (playerToCheck) => {
+            let nets = [];
+            if (playerToCheck == 1) {
+                nets[0] = p1TopNet;
+                nets[1] = p1MidNet;
+                nets[2] = p1BotNet;
+            }
+            else{
+                nets[0] = p2TopNet;
+                nets[1] = p2MidNet;
+                nets[2] = p2BotNet;
+            }
+
+            if (returnY <= netDivTopY){
+                if (nets[0].visible){
+                    nets[0].visible = false;
+                    return true;
+                }
+                else{
+                    return false;
+                }
+            }
+            else if (returnY >= netDivBotY){
+                if (nets[2].visible){
+                    nets[2].visible = false;
+                    return true;
+                }
+                else{
+                    return false;
+                }
+            }
+            else{
+                if (nets[1].visible){
+                    nets[1].visible = false;
+                    return true;
+                }
+                else{
+                    return false;
+                }
+            }
+        }
+
         if (paddleIsPlayer == 1 && stepX - ballSprite.width / 2 <= netXoffset){
-            ballState = 2;
-            playerScore(2, stepX, returnY);
+            if (netCheck(1)){
+                ballAngle = reflectBallAngle(ballAngle, "x");
+                setBallHit();
+                sfxBallHitNet.play();
+            }
+            else{
+                ballState = 2;
+                playerScore(2, stepX, returnY);
+            }
         }
         else if(paddleIsPlayer == 2 && stepX + ballSprite.width / 2 >= app.view.width - netXoffset){
-            ballState = 2;
-            playerScore(1, stepX, returnY);
+            if (netCheck(2)){
+                ballAngle = reflectBallAngle(ballAngle, "x");
+                setBallHit();
+                sfxBallHitNet.play();
+            }
+            else{
+                ballState = 2;
+                playerScore(1, stepX, returnY);
+            }
         }
+
         returnX = stepX;
     }
 
     return {"x": returnX, "y": returnY};
+}
+
+let reflectBallAngle = (angleToReflect, plane) => {    
+    if (plane == "x"){
+        if (angleToReflect == 135) {
+            return 45;
+        }
+        else if (angleToReflect == 225) {
+            return 315;
+        }
+        else if (angleToReflect == 45) {
+            return 135;
+        }
+        else if (angleToReflect == 315) {
+            return 225;
+        }
+        else if (angleToReflect == 0) {
+            return 180;
+        }
+        else if (angleToReflect == 180) {
+            return 0;
+        }
+    }
+    else if (plane == "y"){
+        if (angleToReflect == 225) {
+            return 135;
+        }
+        else if (angleToReflect == 315) {
+            return 45;
+        }
+        else if (angleToReflect == 135) {
+            return 225;
+        }
+        else if (angleToReflect == 45) {
+            return 315;
+        }
+    }
 }
 
 let updateBallTrail = () => {
@@ -636,17 +770,80 @@ let updateStuckTimer = () => {
     }
 }
 
+//Timer control
+let updateGameTimer = () => {
+    const timerBarFlashTime = 0.5;
+    roundTimeElapsed += app.ticker.deltaMS * 0.001
+
+    if (roundTimeElapsed <= roundTimeLimit){
+        timerBars.forEach(bar => {
+            bar.width = bgSprite.width * (1 - roundTimeElapsed / roundTimeLimit)
+        });
+    }
+    else if (roundTimeElapsed >= roundTimeLimit && p1Score == p2Score && !isOvertime){
+        isOvertime = true;
+        scoreToWin = p1Score + 1;
+
+        timerBars.forEach(bar => {
+            bar.width = bgSprite.width
+        });
+    }
+    else if (isOvertime){
+        timerBarFlashTimer += app.ticker.deltaMS * 0.001;
+
+        if (timerBarFlashTimer >= timerBarFlashTime){
+            timerBarFlashTimer = 0;
+            timerBars.forEach(bar => {
+                if (bar.visible == true){
+                    bar.visible = false;
+                }
+                else {
+                    bar.visible = true;
+                }
+            });
+        }
+    }
+    else {
+        gameOver();
+    }
+}
+
 //Start a round
 let startRound = () => {
+    p1Score = 0;
+    p2Score = 0;
+    isGameOver = false;
+    roundTimeElapsed = 0;
+    p1TopNet.visible = true;
+    p1MidNet.visible = true;
+    p1BotNet.visible = true;
+    p2TopNet.visible = true;
+    p2MidNet.visible = true;
+    p2BotNet.visible = true;
+    scoreToWin = scoreToWinDefault;
+    lastPlayerScored = 0;
+    roundTimeElapsed = 0;
+    timerBarFlashTimer = 0;
+    ballTrailLagCount = 0;
+    ballState = 0;
+    ballStuck = 0;
+    ballStuckTimer = 0;
+    ballSpawnTimer = 0;
+    p1.y = app.view.width / 2;
+    p2.y = app.view.width / 2;
+    winnerText.visible = false;
     gameRunning = true;
 }
 
 let playerScore = (player, ballX, ballY) => {
     const pointsTopBot = 1;
     const pointsMid = 2;
+    const firstDelay = 500;
+    const secondDelay = 800;
     let pointsToAward;
     ballExplode.x = ballX;
-    ballExplode.y = ballY;
+    //This y offset of 16 shouldn't be necessary
+    ballExplode.y = ballY - 16;
     ballExplode.gotoAndPlay(0);
 
     sfxBallDestroy.play();
@@ -658,29 +855,57 @@ let playerScore = (player, ballX, ballY) => {
         pointsToAward = pointsTopBot;
     }
 
-    applyScore = () =>{
-        if (player == 1){
-            p1Score += pointsToAward;
-            p1ScoreTxt.text = p1Score;
-            lastPlayerScored = 1
-        }
-        else{
-            p2Score += pointsToAward;
-            p2ScoreTxt.text = p2Score;
-            lastPlayerScored = 2
-        }
-        sfxPoint.play();
+    lastPlayerScored = player
+    if (pointsToAward == 1){
+        setTimeout(scoreFX, firstDelay, player);
     }
-
-    setTimeout(applyScore, 300)
+    else{
+        setTimeout(scoreFX, firstDelay, player);
+        setTimeout(scoreFX, secondDelay, player);
+    }
 
     ballState = 0;
     ballSprite.visible = false;
 }
 
-//Game logic
+let scoreFX = (player) => {
+    if (player == 1){
+        p1Score += 1;
+        p1ScoreTxt.text = p1Score;
+        sfxPoint.play();
+    }
+    else{
+        p2Score += 1;
+        p2ScoreTxt.text = p2Score;
+        sfxPoint.play();
+    }
+}
+
+let checkPlayerScores = () => {
+    if (p1Score >= scoreToWin || p2Score >= scoreToWin){
+        gameOver();
+    }
+}
+
+let gameOver = () => {
+    gameRunning = false;
+    isGameOver = true;
+
+    if (p1Score > p2Score){
+        winnerText.text = "WINNER P1";
+        winnerText.visible = true;
+    }
+    else {
+        winnerText.text = "WINNER P2";
+        winnerText.visible = true;
+    }
+}
+
+//Game loop logic
 let gameLoop = () => {
     if (gameRunning){
+        updateGameTimer();
+        checkPlayerScores();
         checkPlayerMovement();
         updatePlayerIndicators();
         updateBall();
@@ -688,7 +913,6 @@ let gameLoop = () => {
 }
 
 //Keyboard Input
-
 let setupControls = () =>{
     keybListener = new window.keypress.Listener();
     keybListener.register_many([
@@ -818,7 +1042,36 @@ let p2Super = () => {
 } 
 
 let pause = () => {
-    console.log("pause");
+    if (gameRunning && !isGameOver) {
+        gameRunning = false;
+
+        ballHits.forEach(hit => {
+            if (hit.playing) {
+                hit.stop();
+            }
+        })
+
+        if (ballExplode.playing) {
+            ballExplode.stop();
+        }
+    }
+    else if (!gameRunning && !isGameOver){
+        gameRunning = true;
+
+        ballHits.forEach(hit => {
+            if (hit.currentFrame > 0) {
+                hit.play();
+            }
+        })
+
+        if (ballExplode.currentFrame > 0) {
+            ballExplode.play();
+        }
+    }
+
+    if (isGameOver) {
+        startRound();
+    }
 }
 
 //Update size of player indicators
