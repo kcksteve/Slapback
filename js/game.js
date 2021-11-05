@@ -16,6 +16,7 @@ let p1;
 let p1Indicator;
 let p1MoveUp = false;
 let p1MoveDown = false;
+let p1PadIndex = 0;
 let p1Score;
 let p1ScoreTxt;
 let p1Speed;
@@ -28,6 +29,7 @@ let p2;
 let p2Indicator;
 let p2MoveUp = false;
 let p2MoveDown = false;
+let p2PadIndex = 1;
 let p2Score;
 let p2ScoreTxt;
 let p2Speed;
@@ -76,6 +78,7 @@ let sfxBallDestroy;
 
 let isGameOver;
 let keybListener;
+let gamepadListener;
 let gameRunning;
 let keys = {};
 let keysPressed = {};
@@ -829,8 +832,8 @@ let startRound = () => {
     ballStuck = 0;
     ballStuckTimer = 0;
     ballSpawnTimer = 0;
-    p1.y = app.view.width / 2;
-    p2.y = app.view.width / 2;
+    p1.y = app.view.height / 2;
+    p2.y = app.view.height / 2;
     winnerText.visible = false;
     gameRunning = true;
 }
@@ -912,8 +915,9 @@ let gameLoop = () => {
     }
 }
 
-//Keyboard Input
+//Player Input
 let setupControls = () =>{
+    //Keyboard setup
     keybListener = new window.keypress.Listener();
     keybListener.register_many([
         {
@@ -975,6 +979,76 @@ let setupControls = () =>{
             "prevent_repeat" : true
         }
     ]);
+
+    //Gamepad setup
+    Controller.search();
+    window.addEventListener("gc.button.press", (event) => {
+        let button = event.detail;
+        switch (button.name) {
+            case "DPAD_UP":
+                if (button.controllerIndex == p1PadIndex){
+                    p1MoveUp = true;
+                }
+                else if (button.controllerIndex == p2PadIndex){
+                    p2MoveUp = true;
+                }
+                break;
+            case "DPAD_DOWN":
+                if (button.controllerIndex == p1PadIndex){
+                    p1MoveDown = true;
+                }
+                else if (button.controllerIndex == p2PadIndex){
+                    p2MoveDown = true;
+                }
+                break;
+            case "FACE_1":
+                if (button.controllerIndex == p1PadIndex){
+                    p1Shoot();
+                }
+                else if (button.controllerIndex == p2PadIndex){
+                    p2Shoot();
+                }
+                break;
+            case "FACE_2":
+                if (button.controllerIndex == p1PadIndex){
+                    p1Super();
+                }
+                else if (button.controllerIndex == p2PadIndex){
+                    p2Super();
+                }
+                break;
+            case "START":
+                if (button.controllerIndex == p1PadIndex){
+                    pause();
+                }
+                else if (button.controllerIndex == p2PadIndex){
+                    pause();
+                }
+                break;
+        }
+    }, false);
+
+    window.addEventListener("gc.button.release", (event) => {
+        let button = event.detail;
+        switch (button.name) {
+            case "DPAD_UP":
+                if (button.controllerIndex == p1PadIndex){
+                    p1MoveUp = false;
+                }
+                else if (button.controllerIndex == p2PadIndex){
+                    p2MoveUp = false;
+                }
+                break;
+            case "DPAD_DOWN":
+                if (button.controllerIndex == p1PadIndex){
+                    p1MoveDown = false;
+                }
+                else if (button.controllerIndex == p2PadIndex){
+                    p2MoveDown = false;
+                }
+                break;
+        }
+    }, false);
 }
 
 //Player action functions
