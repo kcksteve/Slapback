@@ -10,6 +10,7 @@ const paddleYGap = 10;
 const netDivTopY = 200;
 const netDivBotY = 400;
 const netXoffset = 30;
+const paddleHeight = 80;
 
 let p1;
 let p1Indicator;
@@ -189,6 +190,7 @@ let setupPlayers = () => {
     p1.anchor.set(0.5);
     p1.x = p1.width / 2 + offsetFromEdge;
     p1.y = app.view.height / 2;
+    p1.height = paddleHeight;
     p1.zIndex = 11;
     app.stage.addChild(p1);
     //p1 paddle indicator
@@ -207,6 +209,7 @@ let setupPlayers = () => {
     p2.anchor.set(0.5);
     p2.x = app.view.width - offsetFromEdge + p2.width / 2;
     p2.y = app.view.height / 2;
+    p2.height = paddleHeight;
     p2.zIndex = 10;
     app.stage.addChild(p2);
     //p2 paddle indicator
@@ -1316,8 +1319,8 @@ let pause = () => {
 
 //Update size of player indicators
 let updatePlayerIndicators = () => {
-    p1Indicator.height = (p1Charge / fullPlayerCharge) * p1.height;
-    p2Indicator.height = (p2Charge / fullPlayerCharge) * p2.height;
+    p1Indicator.height = (p1Charge / fullPlayerCharge) * 100;
+    p2Indicator.height = (p2Charge / fullPlayerCharge) * 100;
 }
 
 //Check player movement variables
