@@ -5,8 +5,7 @@ const basePlayerSpeed = 42;
 const chargedPlayerSpeed = 65;
 const fullPlayerCharge = 6;
 const playAreaOffset = 20;
-const roundTimeLimit = 100;
-const scoreToWinDefault = 7;
+const roundTimeLimit = 60;
 const paddleYGap = 10;
 const netDivTopY = 200;
 const netDivBotY = 400;
@@ -43,10 +42,13 @@ let isOvertime = false;
 let scoreToWin = 7;
 let lastPlayerScored = 0;
 let roundTimeElapsed = 0;
+let round = 0;
+let roundWinners = [];
+let roverLabels = [];
+let roverBox = [];
 let timerBarFlashTimer = 0;
 let bgSprite;
 let timerBars = [];
-let winnerText;
 
 let ballExplode;
 let ballExplodeSheet = [];
@@ -75,6 +77,7 @@ let sfxBounce;
 let sfxPoint;
 let sfxSuper;
 let sfxBallDestroy;
+let sfxRoundPoint;
 
 let isGameOver;
 let keybListener;
@@ -124,12 +127,14 @@ let preloadAssets = () => {
     app.loader.add("ballhit", "images/BallHit.png")
     app.loader.add("ballexplode", "images/BallExplode.png")
     app.loader.add("timerbar", "images/TimerBar.png")
+    app.loader.add("winnerbox", "images/WinnerBox.png")
     app.loader.add("sfxBounce", "audio/bounce.mp3")
     app.loader.add("sfxPoint", "audio/point.mp3")
     app.loader.add("sfxBallDestroy", "audio/balldestroy.mp3")
     app.loader.add("sfxSuper", "audio/super.mp3")
     app.loader.add("sfxPlayerMiss", "audio/playermiss.mp3")
     app.loader.add("sfxBallHitNet", "audio/ballhitnet.mp3")
+    app.loader.add("sfxRoundPoint", "audio/roundpoint.mp3")
 
     app.loader.load(setupAll);
 }
@@ -164,6 +169,11 @@ let setupAudio = () => {
 
     sfxBallHitNet = new Howl({
         src: [app.loader.resources["sfxBallHitNet"].url],
+        volume: volumeAll
+    })
+
+    sfxRoundPoint = new Howl({
+        src: [app.loader.resources["sfxRoundPoint"].url],
         volume: volumeAll
     })
 }
@@ -274,6 +284,11 @@ let setupUI = () => {
         fontSize: 60,
         fontFamily: "thirteenPixels"
     })
+    const roverLabelStyle = new PIXI.TextStyle({
+        fill: 0xFFFFFF,
+        fontSize: 36,
+        fontFamily: "thirteenPixels"
+    })
 
     //Setup p1 score counter
     p1ScoreTxt = new PIXI.Text("0");
@@ -292,15 +307,6 @@ let setupUI = () => {
     p2ScoreTxt.style = scoreTxtStyle;
     app.stage.addChild(p2ScoreTxt);
 
-    //Setup winner text
-    winnerText = new PIXI.Text("WINNER P0");
-    winnerText.x = app.view.width / 2;
-    winnerText.y = app.view.height / 2;
-    winnerText.anchor.set(0.5);
-    winnerText.style = scoreTxtStyle;
-    winnerText.visible = false;
-    app.stage.addChild(winnerText);
-
     //Setup timer bars
     const timerBarGap = 4;
     //Top timer bar
@@ -315,6 +321,86 @@ let setupUI = () => {
     timerBars[1].x = app.view.width / 2;
     timerBars[1].y = app.view.height / 2 + bgSprite.height / 2 + timerBarGap; 
     app.stage.addChild(timerBars[1]);
+
+
+    //Setup round over screen
+    const roverBoxSpacing = 64;
+    const roverLabelOffset = roverBoxSpacing * 2;
+    //Round over text
+    for (i = 0; i < 3; i++){
+        roverLabels[i] = new PIXI.Text("");
+
+        switch(i){
+            case 0:
+                roverLabels[i].style = scoreTxtStyle;
+                roverLabels[i].x = app.view.width / 2;
+                roverLabels[i].y = app.view.height / 2 - roverLabelOffset;
+                roverLabels[i].anchor.set(0.5);
+                roverLabels[i].text = "";
+                roverLabels[i].visible = false;
+
+                break;
+            case 1:
+                roverLabels[i].style = roverLabelStyle;
+                roverLabels[i].x = roverBoxSpacing * -1.6;
+                roverLabels[i].y = roverLabelOffset - roverBoxSpacing / 2;
+                roverLabels[i].anchor.set(0.5);
+                roverLabels[i].text = "P1";
+                break;
+            case 2:
+                roverLabels[i].style = roverLabelStyle;
+                roverLabels[i].x = roverBoxSpacing * -1.6;
+                roverLabels[i].y = roverLabelOffset + roverBoxSpacing / 2;
+                roverLabels[i].anchor.set(0.5);
+                roverLabels[i].text = "P2";
+                break;
+        }
+
+
+
+        if (i == 0){
+            app.stage.addChild(roverLabels[i]);
+        }
+        else {
+            roverLabels[0].addChild(roverLabels[i]);
+        }
+    }
+
+    //Round over boxes
+    let ssheet = new PIXI.BaseTexture.from(app.loader.resources["winnerbox"].url);
+    let roverBoxSheet = [];
+    let sheetSize = ssheet.height;
+    let frames = ssheet.width / ssheet.height
+    for (i = 0; i < frames; i++){
+        roverBoxSheet.push(new PIXI.Texture(ssheet, new PIXI.Rectangle(i * sheetSize, 0, sheetSize, sheetSize)));
+    }
+
+    for (i = 0; i < 6; i++){
+        roverBox[i] = new PIXI.AnimatedSprite(roverBoxSheet);
+        roverBox[i].anchor.set(0.5);
+
+        if (i == 0 || i == 3){
+            roverBox[i].x = roverBoxSpacing / 2 * -1;
+        }
+        else if (i == 1 || i == 4){
+            roverBox[i].x = roverBoxSpacing / 2;
+        }
+        else {
+            roverBox[i].x = roverBoxSpacing * 1.5;
+        }
+
+        if (i < 3){
+            roverBox[i].y = roverLabelOffset - roverBoxSpacing / 2;
+        }
+        else{
+            roverBox[i].y = roverLabelOffset + roverBoxSpacing / 2;
+        }
+        
+        roverBox[i].animationSpeed = 0;
+        roverBox[i].loop = false;
+        roverLabels[0].addChild(roverBox[i]);
+    }
+
 }
 
 //Setup ball
@@ -807,15 +893,25 @@ let updateGameTimer = () => {
         }
     }
     else {
-        gameOver();
+        if (p1Score > p2Score){
+            roundOver(1);
+        }
+        else {
+            roundOver(2);
+        }
     }
 }
 
 //Start a round
 let startRound = () => {
+    p1ScoreTxt.text = 0;
+    p2ScoreTxt.text = 0;
     p1Score = 0;
     p2Score = 0;
+    p1Charge = 0;
+    p2Charge = 0;
     isGameOver = false;
+    isOvertime = false;
     roundTimeElapsed = 0;
     p1TopNet.visible = true;
     p1MidNet.visible = true;
@@ -823,9 +919,7 @@ let startRound = () => {
     p2TopNet.visible = true;
     p2MidNet.visible = true;
     p2BotNet.visible = true;
-    scoreToWin = scoreToWinDefault;
     lastPlayerScored = 0;
-    roundTimeElapsed = 0;
     timerBarFlashTimer = 0;
     ballTrailLagCount = 0;
     ballState = 0;
@@ -834,15 +928,15 @@ let startRound = () => {
     ballSpawnTimer = 0;
     p1.y = app.view.height / 2;
     p2.y = app.view.height / 2;
-    winnerText.visible = false;
+    roverLabels[0].visible = false;
     gameRunning = true;
 }
 
 let playerScore = (player, ballX, ballY) => {
     const pointsTopBot = 1;
     const pointsMid = 2;
-    const firstDelay = 500;
-    const secondDelay = 800;
+    const firstDelay = 300;
+    const secondDelay = 500;
     let pointsToAward;
     ballExplode.x = ballX;
     //This y offset of 16 shouldn't be necessary
@@ -859,12 +953,24 @@ let playerScore = (player, ballX, ballY) => {
     }
 
     lastPlayerScored = player
+    if (player == 1){
+        p1Score += pointsToAward;
+    }
+    else{
+        p2Score += pointsToAward;
+    }
+
     if (pointsToAward == 1){
+
         setTimeout(scoreFX, firstDelay, player);
     }
     else{
         setTimeout(scoreFX, firstDelay, player);
         setTimeout(scoreFX, secondDelay, player);
+    }
+
+    if (isOvertime){
+        roundOver(player);
     }
 
     ballState = 0;
@@ -873,42 +979,101 @@ let playerScore = (player, ballX, ballY) => {
 
 let scoreFX = (player) => {
     if (player == 1){
-        p1Score += 1;
         p1ScoreTxt.text = p1Score;
         sfxPoint.play();
     }
     else{
-        p2Score += 1;
         p2ScoreTxt.text = p2Score;
         sfxPoint.play();
     }
 }
 
-let checkPlayerScores = () => {
-    if (p1Score >= scoreToWin || p2Score >= scoreToWin){
-        gameOver();
+let roundOver = (player) => {
+    gameRunning = false;
+    roundWinners[round] = player;
+    roverLabels[0].visible = true;
+
+    let updateRoundOver = () => {
+        sfxRoundPoint.play();
+
+        switch (round) {
+            case 0:
+                if (player == 1) {
+                    roverBox[0].gotoAndPlay(1);
+                }
+                else {
+                    roverBox[3].gotoAndPlay(1);
+                }
+                break;
+            case 1:
+                if (player == 1) {
+                    roverBox[1].gotoAndPlay(1);
+                }
+                else {
+                    roverBox[4].gotoAndPlay(1);
+                }
+                break;
+            case 2:
+                if (player == 1) {
+                    roverBox[2].gotoAndPlay(1);
+                }
+                else {
+                    roverBox[5].gotoAndPlay(1);
+                }
+                break;
+        }
+
+        round += 1;
+        let p1Wins = 0;
+        let p2Wins = 0;
+        let winner = 0;
+
+        for (i = 0; i < 3; i++) {
+            if (roundWinners[i] == 1){
+                p1Wins += 1;
+            }
+            else if (roundWinners[i] == 2){
+                p2Wins += 1;
+            }
+        }
+
+        if (p1Wins >= 2 || p2Wins >= 2){
+            if (p1Wins > p2Wins) {
+                winner = 1;
+            }
+            else {
+                winner = 2;
+            }
+
+            roverLabels[0].text = "WINNER P" + player;
+            gameOver();   
+        }
+        else {
+            setTimeout(startRound, 2500);
+        }
     }
+
+    setTimeout(updateRoundOver, 1200);
 }
 
 let gameOver = () => {
     gameRunning = false;
     isGameOver = true;
+}
 
-    if (p1Score > p2Score){
-        winnerText.text = "WINNER P1";
-        winnerText.visible = true;
-    }
-    else {
-        winnerText.text = "WINNER P2";
-        winnerText.visible = true;
-    }
+let newGameReset = () => {
+    round = 0;
+    roundWinners = [0,0,0];
+    roverLabels[0].text = "";
+    roverBox.forEach(rBox => {
+        rBox.gotoAndPlay(0);
+    })
 }
 
 //Game loop logic
 let gameLoop = () => {
     if (gameRunning){
         updateGameTimer();
-        checkPlayerScores();
         checkPlayerMovement();
         updatePlayerIndicators();
         updateBall();
@@ -1144,6 +1309,7 @@ let pause = () => {
     }
 
     if (isGameOver) {
+        newGameReset();
         startRound();
     }
 }
