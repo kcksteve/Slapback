@@ -102,6 +102,13 @@ window.onload = () => {
     
     //Add pixi to body
     document.body.appendChild(app.view);
+    
+    //Match background to canvas
+    document.body.style.backgroundColor = "#0D0D0D";
+
+    //Scale canvas to window
+    scaleMe(app);
+    window.addEventListener("resize", () => {scaleMe(app)});
 
     //Load all images and audio
     preloadAssets();
