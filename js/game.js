@@ -1,7 +1,7 @@
 //Global vars and constants
 let app;
 
-const basePlayerSpeed = 42;
+const basePlayerSpeed = 44;
 const chargedPlayerSpeed = 65;
 const fullPlayerCharge = 6;
 const playAreaOffset = 20;
@@ -43,6 +43,7 @@ let isOvertime = false;
 let scoreToWin = 7;
 let lastPlayerScored = 0;
 let roundTimeElapsed = 0;
+let roundCountDownTicks = 0;
 let round = 0;
 let roundWinners = [];
 let roverLabels = [];
@@ -79,6 +80,7 @@ let sfxPoint;
 let sfxSuper;
 let sfxBallDestroy;
 let sfxRoundPoint;
+let sfxCountDown;
 
 let isGameOver;
 let keybListener;
@@ -94,7 +96,7 @@ window.onload = () => {
             width: 800,
             height: 600,
             backgroundColor: 0x0D0D0D,
-            roundPixels: true
+            roundPixels: true,
         }
     );
     
@@ -136,6 +138,7 @@ let preloadAssets = () => {
     app.loader.add("sfxPlayerMiss", "audio/playermiss.mp3")
     app.loader.add("sfxBallHitNet", "audio/ballhitnet.mp3")
     app.loader.add("sfxRoundPoint", "audio/roundpoint.mp3")
+    app.loader.add("sfxCountDown", "audio/countdowntick.mp3")
 
     app.loader.load(setupAll);
 }
@@ -175,6 +178,11 @@ let setupAudio = () => {
 
     sfxRoundPoint = new Howl({
         src: [app.loader.resources["sfxRoundPoint"].url],
+        volume: volumeAll
+    })
+
+    sfxCountDown = new Howl({
+        src: [app.loader.resources["sfxCountDown"].url],
         volume: volumeAll
     })
 }
@@ -871,6 +879,11 @@ let updateGameTimer = () => {
         timerBars.forEach(bar => {
             bar.width = bgSprite.width * (1 - roundTimeElapsed / roundTimeLimit)
         });
+
+        if (roundTimeElapsed >= roundTimeLimit - roundCountDownTicks){
+            roundCountDownTicks --;
+            sfxCountDown.play();
+        }
     }
     else if (roundTimeElapsed >= roundTimeLimit && p1Score == p2Score && !isOvertime){
         isOvertime = true;
@@ -916,6 +929,7 @@ let startRound = () => {
     isGameOver = false;
     isOvertime = false;
     roundTimeElapsed = 0;
+    roundCountDownTicks = 10;
     p1TopNet.visible = true;
     p1MidNet.visible = true;
     p1BotNet.visible = true;
