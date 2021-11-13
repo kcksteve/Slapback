@@ -51,6 +51,9 @@ let roverBox = [];
 let timerBarFlashTimer = 0;
 let bgSprite;
 let timerBars = [];
+let blinder;
+let pauseTxt;
+let pauseTxt2;
 
 let ballExplode;
 let ballExplodeSheet = [];
@@ -105,6 +108,9 @@ window.onload = () => {
     //Add pixi to body
     document.body.appendChild(app.view);
     
+    //Enable z sorting
+    app.stage.sortableChildren = true;
+
     //Match background to canvas
     document.body.style.backgroundColor = "#0D0D0D";
 
@@ -140,6 +146,7 @@ let preloadAssets = () => {
     app.loader.add("ballexplode", "images/BallExplode.png")
     app.loader.add("timerbar", "images/TimerBar.png")
     app.loader.add("winnerbox", "images/WinnerBox.png")
+    app.loader.add("blinder", "images/Blinder.png")
     app.loader.add("sfxBounce", "audio/bounce.mp3")
     app.loader.add("sfxPoint", "audio/point.mp3")
     app.loader.add("sfxBallDestroy", "audio/balldestroy.mp3")
@@ -310,6 +317,12 @@ let setupUI = () => {
         fontFamily: "thirteenPixels"
     })
 
+    const pauseSubTxtStyle = new PIXI.TextStyle({
+        fill: 0xFFFFFF,
+        fontSize: 16,
+        fontFamily: "thirteenPixels"
+    })
+
     //Setup p1 score counter
     p1ScoreTxt = new PIXI.Text("0");
     p1ScoreTxt.x = app.view.width / 2 - scoreTxtXOffset;
@@ -421,6 +434,33 @@ let setupUI = () => {
         roverLabels[0].addChild(roverBox[i]);
     }
 
+    //Setup Blinder
+    blinder = new PIXI.Sprite.from(app.loader.resources["blinder"].url);
+    blinder.anchor.set(0.5);
+    blinder.x = app.view.width / 2;
+    blinder.y = app.view.height / 2;
+    blinder.zIndex = 100;
+    blinder.alpha = 0;
+    app.stage.addChild(blinder);
+
+    //Setup pause text
+    pauseTxt = new PIXI.Text("PAUSE");
+    pauseTxt.x = app.view.width / 2;
+    pauseTxt.y = app.view.height / 2;
+    pauseTxt.anchor.set(0.5);
+    pauseTxt.zIndex = 101;
+    pauseTxt.alpha = 0;
+    pauseTxt.style = scoreTxtStyle;
+    app.stage.addChild(pauseTxt);
+
+    pauseTxt2 = new PIXI.Text("BACKSPACE OR BACK FOR MENU");
+    pauseTxt2.x = app.view.width / 2;
+    pauseTxt2.y = app.view.height / 2 + 50;
+    pauseTxt2.anchor.set(0.5);
+    pauseTxt2.zIndex = 101;
+    pauseTxt2.alpha = 0;
+    pauseTxt2.style = pauseSubTxtStyle;
+    app.stage.addChild(pauseTxt2);
 }
 
 //Setup ball
@@ -495,7 +535,7 @@ let createBall = () => {
     ballSprite.x = app.view.width / 2;
     ballSprite.y = 120;
     ballStartMovementY = (app.view.height / 2 - 100) + Math.floor(Math.random() * 200);
-    ballSprite.zIndex = 20;
+    ballSprite.zIndex = 0;
     app.stage.addChild(ballSprite);
     ballState = 1;
     ballSpeedState = 0;
@@ -1319,6 +1359,9 @@ let p2Super = () => {
 let pause = () => {
     if (gameRunning && !isGameOver) {
         gameRunning = false;
+        blinder.alpha = 0.75;
+        pauseTxt.alpha = 1;
+        pauseTxt2.alpha = 1;
 
         ballHits.forEach(hit => {
             if (hit.playing) {
@@ -1332,6 +1375,9 @@ let pause = () => {
     }
     else if (!gameRunning && !isGameOver){
         gameRunning = true;
+        blinder.alpha = 0;
+        pauseTxt.alpha = 0;
+        pauseTxt2.alpha = 0;
 
         ballHits.forEach(hit => {
             if (hit.currentFrame > 0) {
