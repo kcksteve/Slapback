@@ -62,6 +62,8 @@ let ballTrailLagCount = 0;
 let ballLastPositions = [];
 let ballSprite;
 let ballAngle;
+let ballNextAngle;
+let ballStartMovementY;
 let ballHalo;
 let ballState = 0;
 let ballStuck = 0;
@@ -491,27 +493,29 @@ let createBall = () => {
     ballSprite = new PIXI.Sprite.from(app.loader.resources["ball"].url);
     ballSprite.anchor.set(0.5);
     ballSprite.x = app.view.width / 2;
-    ballSprite.y = (app.view.height / 2 - 100) + Math.floor(Math.random() * 200);
+    ballSprite.y = 120;
+    ballStartMovementY = (app.view.height / 2 - 100) + Math.floor(Math.random() * 200);
     ballSprite.zIndex = 20;
     app.stage.addChild(ballSprite);
     ballState = 1;
     ballSpeedState = 0;
+    ballAngle = 90;
 
     if (lastPlayerScored == 0){
         randAngle = Math.floor(Math.random() * 4)
 
         switch (randAngle) {
             case 0:
-                ballAngle = 45;
+                ballNextAngle = 45;
                 break;
             case 1:
-                ballAngle = 135;
+                ballNextAngle = 135;
                 break;
             case 2:
-                ballAngle = 225;
+                ballNextAngle = 225;
                 break;
             case 3:
-                ballAngle = 315;
+                ballNextAngle = 315;
                 break;
         }
     }
@@ -520,10 +524,10 @@ let createBall = () => {
 
         switch (randAngle) {
             case 0:
-                ballAngle = 135;
+                ballNextAngle = 135;
                 break;
             case 1:
-                ballAngle = 225;
+                ballNextAngle = 225;
                 break;
         }
     }
@@ -532,10 +536,10 @@ let createBall = () => {
 
         switch (randAngle) {
             case 0:
-                ballAngle = 45;
+                ballNextAngle = 45;
                 break;
             case 1:
-                ballAngle = 315;
+                ballNextAngle = 315;
                 break;
         }
     }
@@ -548,6 +552,10 @@ let moveBall = () => {
         let steppedLoc = {};
         const straightMulti = 1.4142;
 
+        if (ballAngle == 90 && ballSprite.y >= ballStartMovementY) {
+            ballAngle = ballNextAngle;
+        }
+
         switch (ballAngle) {
             case 0:
                 ballOffsetX = ballSpeeds[ballSpeedState] * straightMulti;
@@ -556,6 +564,10 @@ let moveBall = () => {
             case 45:
                 ballOffsetX = ballSpeeds[ballSpeedState];
                 ballOffsetY = ballSpeeds[ballSpeedState];
+                break;
+            case 90:
+                ballOffsetX = 0;
+                ballOffsetY = 15;
                 break;
             case 135:
                 ballOffsetX = ballSpeeds[ballSpeedState] * -1;

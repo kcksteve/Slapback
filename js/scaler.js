@@ -4,7 +4,6 @@
     let scale;
 
     if (pixi.view.width > pixi.view.height) {
-
         if (pixi.view.height * (window.innerWidth / app.view.width) < window.innerHeight) {
             scale = window.innerWidth / app.view.width;
         }
