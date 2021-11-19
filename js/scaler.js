@@ -1,6 +1,4 @@
  let scaleMe = (pixi) => {
-    console.log("scale");
-
     let scale;
 
     if (pixi.view.width > pixi.view.height) {

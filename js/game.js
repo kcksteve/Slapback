@@ -1,16 +1,16 @@
 //Global vars and constants
 let app;
 
-const basePlayerSpeed = 44;
+const basePlayerSpeed = 48;
 const chargedPlayerSpeed = 65;
 const fullPlayerCharge = 6;
 const playAreaOffset = 20;
-const roundTimeLimit = 60;
+const roundTimeLimit = 5;
 const paddleYGap = 10;
 const netDivTopY = 200;
 const netDivBotY = 400;
 const netXoffset = 30;
-const paddleHeight = 80;
+const paddleHeight = 70;
 
 let p1;
 let p1Indicator;
@@ -38,8 +38,10 @@ let p2TopNet;
 let p2MidNet;   
 let p2BotNet;
 
+let gameState;
 let isPaused = false;
 let isOvertime = false;
+let isMidRound = false;
 let scoreToWin = 7;
 let lastPlayerScored = 0;
 let roundTimeElapsed = 0;
@@ -54,6 +56,14 @@ let timerBars = [];
 let blinder;
 let pauseTxt;
 let pauseTxt2;
+let titleSprite;
+let menuTxt;
+let menuTxt2;
+let menuTxt3;
+let menuPointers = [];
+let menuPointerState = 0;
+let menuCanPointerChange = false;
+const menuPointerOffset = 20;
 
 let ballExplode;
 let ballExplodeSheet = [];
@@ -86,6 +96,8 @@ let sfxSuper;
 let sfxBallDestroy;
 let sfxRoundPoint;
 let sfxCountDown;
+let sfxTitle;
+let sfxStart;
 
 let isGameOver;
 let keybListener;
@@ -130,7 +142,7 @@ let setupAll = () => {
     setupLevel();
     setupUI();
     setupAudio();
-    startRound();
+    menuStart();
     app.ticker.add(gameLoop);
 }
 
@@ -147,6 +159,7 @@ let preloadAssets = () => {
     app.loader.add("timerbar", "images/TimerBar.png")
     app.loader.add("winnerbox", "images/WinnerBox.png")
     app.loader.add("blinder", "images/Blinder.png")
+    app.loader.add("title", "images/Title.png")
     app.loader.add("sfxBounce", "audio/bounce.mp3")
     app.loader.add("sfxPoint", "audio/point.mp3")
     app.loader.add("sfxBallDestroy", "audio/balldestroy.mp3")
@@ -155,6 +168,8 @@ let preloadAssets = () => {
     app.loader.add("sfxBallHitNet", "audio/ballhitnet.mp3")
     app.loader.add("sfxRoundPoint", "audio/roundpoint.mp3")
     app.loader.add("sfxCountDown", "audio/countdowntick.mp3")
+    app.loader.add("sfxStart", "audio/startgame.mp3")
+    app.loader.add("sfxTitle", "audio/titleshow.mp3")
 
     app.loader.load(setupAll);
 }
@@ -199,6 +214,16 @@ let setupAudio = () => {
 
     sfxCountDown = new Howl({
         src: [app.loader.resources["sfxCountDown"].url],
+        volume: volumeAll
+    })
+
+    sfxTitle = new Howl({
+        src: [app.loader.resources["sfxTitle"].url],
+        volume: volumeAll
+    })
+
+    sfxStart = new Howl({
+        src: [app.loader.resources["sfxStart"].url],
         volume: volumeAll
     })
 }
@@ -317,6 +342,12 @@ let setupUI = () => {
         fontFamily: "thirteenPixels"
     })
 
+    const menuTxtStyle = new PIXI.TextStyle({
+        fill: 0xFFFFFF,
+        fontSize: 24,
+        fontFamily: "thirteenPixels"
+    })
+
     const pauseSubTxtStyle = new PIXI.TextStyle({
         fill: 0xFFFFFF,
         fontSize: 16,
@@ -360,7 +391,7 @@ let setupUI = () => {
     const roverBoxSpacing = 64;
     const roverLabelOffset = roverBoxSpacing * 2;
     //Round over text
-    for (i = 0; i < 3; i++){
+    for (i = 0; i < 5; i++){
         roverLabels[i] = new PIXI.Text("");
 
         switch(i){
@@ -386,6 +417,20 @@ let setupUI = () => {
                 roverLabels[i].y = roverLabelOffset + roverBoxSpacing / 2;
                 roverLabels[i].anchor.set(0.5);
                 roverLabels[i].text = "P2";
+                break;
+            case 3:
+                roverLabels[i].style = pauseSubTxtStyle;
+                roverLabels[i].x = 0;
+                roverLabels[i].y = roverLabelOffset + roverBoxSpacing * 2;
+                roverLabels[i].anchor.set(0.5);
+                roverLabels[i].text = "ENTER/START TO PLAY AGAIN";
+                break;
+            case 4:
+                roverLabels[i].style = pauseSubTxtStyle;
+                roverLabels[i].x = 0;
+                roverLabels[i].y = roverLabelOffset + roverBoxSpacing * 1.5;
+                roverLabels[i].anchor.set(0.5);
+                roverLabels[i].text = "BACKSPACE/BACK FOR MENU";
                 break;
         }
 
@@ -453,7 +498,7 @@ let setupUI = () => {
     pauseTxt.style = scoreTxtStyle;
     app.stage.addChild(pauseTxt);
 
-    pauseTxt2 = new PIXI.Text("BACKSPACE OR BACK FOR MENU");
+    pauseTxt2 = new PIXI.Text("BACKSPACE/BACK FOR MENU");
     pauseTxt2.x = app.view.width / 2;
     pauseTxt2.y = app.view.height / 2 + 50;
     pauseTxt2.anchor.set(0.5);
@@ -461,6 +506,50 @@ let setupUI = () => {
     pauseTxt2.alpha = 0;
     pauseTxt2.style = pauseSubTxtStyle;
     app.stage.addChild(pauseTxt2);
+
+    //Setup main menu
+    titleSprite = new PIXI.Sprite.from(app.loader.resources["title"].url);
+    titleSprite.anchor.set(0.5);
+    titleSprite.x = app.view.width / 2;
+    titleSprite.y = 200;
+    titleSprite.zIndex = 102;
+    app.stage.addChild(titleSprite);
+
+    menuTxt = new PIXI.Text("PLAY PVP");
+    menuTxt.y = 140;
+    menuTxt.anchor.set(0.5);
+    menuTxt.zIndex = 102;
+    menuTxt.style = menuTxtStyle;
+    titleSprite.addChild(menuTxt);
+
+    menuTxt2 = new PIXI.Text("HOW TO PLAY");
+    menuTxt2.y = 170;
+    menuTxt2.anchor.set(0.5);
+    menuTxt2.zIndex = 102;
+    menuTxt2.style = menuTxtStyle;
+    titleSprite.addChild(menuTxt2);
+
+    menuTxt3 = new PIXI.Text("QUIT");
+    menuTxt3.y = 200;
+    menuTxt3.anchor.set(0.5);
+    menuTxt3.zIndex = 102;
+    menuTxt3.style = menuTxtStyle;
+    titleSprite.addChild(menuTxt3);
+
+    menuPointers[0] = new PIXI.Sprite.from(app.loader.resources["ball"].url);
+    menuPointers[0].anchor.set(0.5);
+    menuPointers[0].x = menuTxt.width / 2 + menuPointerOffset;
+    menuPointers[0].y = menuTxt.y;
+    menuPointers[0].zIndex = 102;
+    titleSprite.addChild(menuPointers[0]);
+
+    menuPointers[1] = new PIXI.Sprite.from(app.loader.resources["ball"].url);
+    menuPointers[1].anchor.set(0.5);
+    menuPointers[1].x = (menuTxt.width / 2 + menuPointerOffset) * -1;
+    menuPointers[1].y = menuTxt.y;
+    menuPointers[1].zIndex = 102;
+    titleSprite.addChild(menuPointers[1]);
+    
 }
 
 //Setup ball
@@ -979,6 +1068,17 @@ let updateGameTimer = () => {
 
 //Start a round
 let startRound = () => {
+    resetGameObjects();
+    gameRunning = true;
+}
+
+let resetGameObjects = () => {
+    isMidRound = false;
+    titleSprite.visible = false;
+    blinder.alpha = 0;
+    pauseTxt.alpha = 0;
+    pauseTxt2.alpha = 0;
+    gameState = 2;
     p1ScoreTxt.text = 0;
     p2ScoreTxt.text = 0;
     p1Score = 0;
@@ -1005,7 +1105,16 @@ let startRound = () => {
     p1.y = app.view.height / 2;
     p2.y = app.view.height / 2;
     roverLabels[0].visible = false;
-    gameRunning = true;
+
+    if (typeof ballSprite != "undefined") {
+        ballSprite.x = -100;
+        ballSprite.y = -100;
+    }
+
+    ballTrail.forEach((ballTrails) => {
+        ballTrails.x = -100;
+        ballTrails.y = -100;
+    })
 }
 
 let playerScore = (player, ballX, ballY) => {
@@ -1068,6 +1177,10 @@ let roundOver = (player) => {
     gameRunning = false;
     roundWinners[round] = player;
     roverLabels[0].visible = true;
+    roverLabels[0].text = "";
+    roverLabels[3].visible = false;
+    roverLabels[4].visible = false;
+
 
     let updateRoundOver = () => {
         sfxRoundPoint.play();
@@ -1122,9 +1235,12 @@ let roundOver = (player) => {
             }
 
             roverLabels[0].text = "WINNER P" + player;
+            roverLabels[3].visible = true;
+            roverLabels[4].visible = true;
             gameOver();   
         }
         else {
+            isMidRound = true;
             setTimeout(startRound, 2500);
         }
     }
@@ -1164,14 +1280,20 @@ let setupControls = () =>{
         {
             //P1 Up
             "keys" : "w",
-            "on_keydown" : () => p1MoveUp = true,
+            "on_keydown" : () => {
+                menuMove("up");
+                p1MoveUp = true;
+            },
             "on_keyup" : () => p1MoveUp = false,
             "prevent_repeat" : true
         },
         {
             //P1 Down
             "keys" : "s",
-            "on_keydown" : () => p1MoveDown = true,
+            "on_keydown" : () => {
+                menuMove("down");
+                p1MoveDown = true;
+            },
             "on_keyup" : () => p1MoveDown = false,
             "prevent_repeat" : true
         },
@@ -1190,14 +1312,20 @@ let setupControls = () =>{
         {
             //P2 Up
             "keys" : "up",
-            "on_keydown" : () => p2MoveUp = true,
+            "on_keydown" : () => {
+                menuMove("up");
+                p2MoveUp = true;
+            },
             "on_keyup" : () => p2MoveUp = false,
             "prevent_repeat" : true
         },
         {
             //P2 Down
             "keys" : "down",
-            "on_keydown" : () => p2MoveDown = true,
+            "on_keydown" : () => {
+                menuMove("down");
+                p2MoveDown = true;
+            },
             "on_keyup" : () => p2MoveDown = false,
             "prevent_repeat" : true
         },
@@ -1216,7 +1344,26 @@ let setupControls = () =>{
         {
             //Pause
             "keys" : "escape",
-            "on_keydown" : () => pause(),
+            "on_keydown" : () => {
+                pause();
+            },
+            "prevent_repeat" : true
+        },
+        {
+            //Backspace - used during pause
+            "keys" : "backspace",
+            "on_keydown" : () => {
+                menuReturnFromGame();
+            },
+            "prevent_repeat" : true
+        },
+        {
+            //Enter - menus only
+            "keys" : "enter",
+            "on_keydown" : () => {
+                menuSelect();
+                restartGame();
+            },
             "prevent_repeat" : true
         }
     ]);
@@ -1229,25 +1376,31 @@ let setupControls = () =>{
             case "DPAD_UP":
                 if (button.controllerIndex == p1PadIndex){
                     p1MoveUp = true;
+                    menuMove("up");
                 }
                 else if (button.controllerIndex == p2PadIndex){
                     p2MoveUp = true;
+                    menuMove("up");
                 }
                 break;
             case "DPAD_DOWN":
                 if (button.controllerIndex == p1PadIndex){
                     p1MoveDown = true;
+                    menuMove("down");
                 }
                 else if (button.controllerIndex == p2PadIndex){
                     p2MoveDown = true;
+                    menuMove("down");
                 }
                 break;
             case "FACE_1":
                 if (button.controllerIndex == p1PadIndex){
                     p1Shoot();
+                    menuSelect();
                 }
                 else if (button.controllerIndex == p2PadIndex){
                     p2Shoot();
+                    menuSelect();
                 }
                 break;
             case "FACE_2":
@@ -1261,9 +1414,19 @@ let setupControls = () =>{
             case "START":
                 if (button.controllerIndex == p1PadIndex){
                     pause();
+                    restartGame();
                 }
                 else if (button.controllerIndex == p2PadIndex){
                     pause();
+                    restartGame();
+                }
+                break;
+            case "SELECT":
+                if (button.controllerIndex == p1PadIndex){
+                    menuReturnFromGame();
+                }
+                else if (button.controllerIndex == p2PadIndex){
+                    menuReturnFromGame();
                 }
                 break;
         }
@@ -1357,42 +1520,39 @@ let p2Super = () => {
 } 
 
 let pause = () => {
-    if (gameRunning && !isGameOver) {
-        gameRunning = false;
-        blinder.alpha = 0.75;
-        pauseTxt.alpha = 1;
-        pauseTxt2.alpha = 1;
-
-        ballHits.forEach(hit => {
-            if (hit.playing) {
-                hit.stop();
+    if (gameState == 2) {
+        if (gameRunning && !isGameOver && !isMidRound) {
+            gameRunning = false;
+            blinder.alpha = 0.75;
+            pauseTxt.alpha = 1;
+            pauseTxt2.alpha = 1;
+    
+            ballHits.forEach(hit => {
+                if (hit.playing) {
+                    hit.stop();
+                }
+            })
+    
+            if (ballExplode.playing) {
+                ballExplode.stop();
             }
-        })
-
-        if (ballExplode.playing) {
-            ballExplode.stop();
         }
-    }
-    else if (!gameRunning && !isGameOver){
-        gameRunning = true;
-        blinder.alpha = 0;
-        pauseTxt.alpha = 0;
-        pauseTxt2.alpha = 0;
-
-        ballHits.forEach(hit => {
-            if (hit.currentFrame > 0) {
-                hit.play();
+        else if (!gameRunning && !isGameOver && !isMidRound){
+            gameRunning = true;
+            blinder.alpha = 0;
+            pauseTxt.alpha = 0;
+            pauseTxt2.alpha = 0;
+    
+            ballHits.forEach(hit => {
+                if (hit.currentFrame > 0) {
+                    hit.play();
+                }
+            })
+    
+            if (ballExplode.currentFrame > 0) {
+                ballExplode.play();
             }
-        })
-
-        if (ballExplode.currentFrame > 0) {
-            ballExplode.play();
         }
-    }
-
-    if (isGameOver) {
-        newGameReset();
-        startRound();
     }
 }
 
@@ -1518,3 +1678,121 @@ let playSfxBounce = () => {
     sfxBounce.rate(ballSpeedsSfxRates[ballSpeedState]);
     sfxBounce.play();
 }
+
+let restartGame = () => {
+    if (isGameOver && gameState == 2) {
+        newGameReset();
+        startRound();
+    }
+}
+
+let menuStart = () => {
+    gameState = 1;
+    blinder.alpha = 0;
+    titleSprite.visible = false;
+    menuTxt.visible = false;
+    menuTxt2.visible = false;
+    menuTxt3.visible = false;
+    menuPointers[0].visible = false;
+    menuPointers[1].visible = false;
+    menuPointerState = 0;
+    menuCanPointerChange = false;
+
+    setTimeout(() => {
+        sfxTitle.play();
+        titleSprite.visible = true;
+    }, 900);
+    setTimeout(() => {
+        sfxPoint.play();
+        menuTxt.visible = true;
+    }, 1800);
+    setTimeout(() => {
+        sfxPoint.play();
+        menuTxt2.visible = true;
+    }, 2000);
+    setTimeout(() => {
+        sfxPoint.play();
+        menuTxt3.visible = true;
+    }, 2200);
+    setTimeout(menuUpdatePointer, 2700, 0);
+    setTimeout(() => menuCanPointerChange = true, 2800);
+}
+
+let menuMove = (direc) => {
+    if (gameState == 1 && menuCanPointerChange) {
+        if (direc == "up") {
+            if (menuPointerState == 0) {
+                menuUpdatePointer(2);
+            }
+            else {
+                menuUpdatePointer(menuPointerState - 1);
+            }
+        }
+        else if (direc == "down") {
+            if (menuPointerState == 2) {
+                menuUpdatePointer(0);
+            }
+            else {
+                menuUpdatePointer(menuPointerState + 1);
+            }
+        }
+    }
+}
+
+let menuSelect = () => {
+    if (gameState == 1 && menuCanPointerChange) {
+        switch (menuPointerState) {
+            case 0:
+                //Start game
+                sfxStart.play();
+                setTimeout( () => {
+                    newGameReset();
+                    startRound();
+                }, 1000);
+                break;
+            case 1:
+                //How to play
+                break;
+            case 2:
+                //Quit
+                break;
+        }
+    }
+}
+
+let menuUpdatePointer = (nextPos) => {
+    menuPointerState = nextPos;
+    sfxCountDown.play();
+    xOffset = 0;
+    yOffset = 0;
+
+    switch (menuPointerState) {
+        case 0:
+            xOffset = menuTxt.width / 2 + menuPointerOffset;
+            yOffset = menuTxt.y;
+            break;
+        case 1:
+            xOffset = menuTxt2.width / 2 + menuPointerOffset;
+            yOffset = menuTxt2.y;
+            break;
+        case 2:
+            xOffset = menuTxt3.width / 2 + menuPointerOffset;
+            yOffset = menuTxt3.y;
+            break;
+    }
+
+    menuPointers[0].x = xOffset * -1;
+    menuPointers[1].x = xOffset;
+    menuPointers[0].y = yOffset;
+    menuPointers[1].y = yOffset;
+    menuPointers[0].visible = true;
+    menuPointers[1].visible = true;
+}
+
+let menuReturnFromGame = () => {
+    if (gameState == 2 && ((!gameRunning && !isMidRound ) || isGameOver)) {
+        resetGameObjects();
+        menuStart();
+    }
+}
+
