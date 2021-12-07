@@ -1,11 +1,11 @@
 //Global vars and constants
 let app;
 
-const basePlayerSpeed = 48;
-const chargedPlayerSpeed = 65;
+const basePlayerSpeed = 50;
+const chargedPlayerSpeed = 60;
 const fullPlayerCharge = 6;
 const playAreaOffset = 20;
-const roundTimeLimit = 5;
+const roundTimeLimit = 50;
 const paddleYGap = 10;
 const netDivTopY = 200;
 const netDivBotY = 400;
@@ -57,6 +57,7 @@ let blinder;
 let pauseTxt;
 let pauseTxt2;
 let titleSprite;
+let menuHTP;
 let menuTxt;
 let menuTxt2;
 let menuTxt3;
@@ -160,6 +161,7 @@ let preloadAssets = () => {
     app.loader.add("winnerbox", "images/WinnerBox.png")
     app.loader.add("blinder", "images/Blinder.png")
     app.loader.add("title", "images/Title.png")
+    app.loader.add("menuHTP", "images/HowToPlay.png")
     app.loader.add("sfxBounce", "audio/bounce.mp3")
     app.loader.add("sfxPoint", "audio/point.mp3")
     app.loader.add("sfxBallDestroy", "audio/balldestroy.mp3")
@@ -274,6 +276,7 @@ let setupPlayers = () => {
 
 //Setup play area
 let setupLevel = () => {
+    //Background sprite has borders and center divider
     bgSprite = new PIXI.Sprite.from(app.loader.resources["playarea"].url);
     bgSprite.anchor.set(0.5);
     bgSprite.x = app.view.width / 2;
@@ -284,6 +287,7 @@ let setupLevel = () => {
     const netTopY = 114;
     const netBotY = 486;
 
+    //Setup all nets on both sides, should have made this 2 arrays...
     p1TopNet = new PIXI.Sprite.from(app.loader.resources["net"].url);
     p1TopNet.anchor.set(0.5);
     p1TopNet.x = netXoffset;
@@ -331,6 +335,8 @@ let setupLevel = () => {
 let setupUI = () => {
     const scoreTxtXOffset = 10;
     const scoreTxtY = 100;
+
+    //Setup text styles
     const scoreTxtStyle = new PIXI.TextStyle({
         fill: 0xFFFFFF,
         fontSize: 60,
@@ -390,7 +396,7 @@ let setupUI = () => {
     //Setup round over screen
     const roverBoxSpacing = 64;
     const roverLabelOffset = roverBoxSpacing * 2;
-    //Round over text
+    //Round over text labels
     for (i = 0; i < 5; i++){
         roverLabels[i] = new PIXI.Text("");
 
@@ -435,7 +441,7 @@ let setupUI = () => {
         }
 
 
-
+        //All labels are children of the first one
         if (i == 0){
             app.stage.addChild(roverLabels[i]);
         }
@@ -453,6 +459,7 @@ let setupUI = () => {
         roverBoxSheet.push(new PIXI.Texture(ssheet, new PIXI.Rectangle(i * sheetSize, 0, sheetSize, sheetSize)));
     }
 
+    //Setup all 6 boxes
     for (i = 0; i < 6; i++){
         roverBox[i] = new PIXI.AnimatedSprite(roverBoxSheet);
         roverBox[i].anchor.set(0.5);
@@ -476,6 +483,7 @@ let setupUI = () => {
         
         roverBox[i].animationSpeed = 0;
         roverBox[i].loop = false;
+        //All boxes child of first one
         roverLabels[0].addChild(roverBox[i]);
     }
 
@@ -508,6 +516,7 @@ let setupUI = () => {
     app.stage.addChild(pauseTxt2);
 
     //Setup main menu
+    //Logo sprite
     titleSprite = new PIXI.Sprite.from(app.loader.resources["title"].url);
     titleSprite.anchor.set(0.5);
     titleSprite.x = app.view.width / 2;
@@ -515,6 +524,8 @@ let setupUI = () => {
     titleSprite.zIndex = 102;
     app.stage.addChild(titleSprite);
 
+    //Main menu selections - player against player
+    //All selections child of the logo
     menuTxt = new PIXI.Text("PLAY PVP");
     menuTxt.y = 140;
     menuTxt.anchor.set(0.5);
@@ -522,6 +533,7 @@ let setupUI = () => {
     menuTxt.style = menuTxtStyle;
     titleSprite.addChild(menuTxt);
 
+    //Main menu selections - how to play sprite
     menuTxt2 = new PIXI.Text("HOW TO PLAY");
     menuTxt2.y = 170;
     menuTxt2.anchor.set(0.5);
@@ -529,6 +541,7 @@ let setupUI = () => {
     menuTxt2.style = menuTxtStyle;
     titleSprite.addChild(menuTxt2);
 
+    //Main menu selections - quit
     menuTxt3 = new PIXI.Text("QUIT");
     menuTxt3.y = 200;
     menuTxt3.anchor.set(0.5);
@@ -536,6 +549,7 @@ let setupUI = () => {
     menuTxt3.style = menuTxtStyle;
     titleSprite.addChild(menuTxt3);
 
+    //Main menu selections - selection indicators
     menuPointers[0] = new PIXI.Sprite.from(app.loader.resources["ball"].url);
     menuPointers[0].anchor.set(0.5);
     menuPointers[0].x = menuTxt.width / 2 + menuPointerOffset;
@@ -550,6 +564,13 @@ let setupUI = () => {
     menuPointers[1].zIndex = 102;
     titleSprite.addChild(menuPointers[1]);
     
+    //Main menu selections - quit
+    menuHTP = new PIXI.Sprite.from(app.loader.resources["menuHTP"].url);
+    menuHTP.anchor.set(0.5);
+    menuHTP.x = app.view.width / 2;
+    menuHTP.y = app.view.height / 2;
+    menuHTP.zIndex = 102;
+    app.stage.addChild(menuHTP);
 }
 
 //Setup ball
@@ -569,6 +590,7 @@ let setupBall = () => {
         ballHitSheet.push(new PIXI.Texture(ssheet, new PIXI.Rectangle(i * sheetSize, 0, sheetSize, sheetSize)));
     }
 
+    //Setup pool of impact sprites
     for (i = 0; i < 4; i++){
         ballHits.push(new PIXI.AnimatedSprite(ballHitSheet));
         ballHits[i].anchor.set(0.5);
@@ -583,6 +605,8 @@ let setupBall = () => {
     let ssheet2 = new PIXI.BaseTexture.from(app.loader.resources["ballexplode"].url);
     let sheet2Size = ssheet2.height;
     let frames2 = ssheet2.width / ssheet2.height
+
+    //Setup pool of explode sprites
     for (i = 0; i < frames2; i++){
         ballExplodeSheet.push(new PIXI.Texture(ssheet2, new PIXI.Rectangle(i * sheet2Size, 0, sheet2Size, sheet2Size)));
     }
@@ -597,6 +621,7 @@ let setupBall = () => {
 
     //Setup ball trail
     let ballTrailShrink = 4; 
+    //Setup ball pool
     for (i = 0; i < 3; i++){
         ballTrail[i] = new PIXI.Sprite.from(app.loader.resources["ball"].url);
         ballTrail[i].x = -100;
@@ -607,12 +632,13 @@ let setupBall = () => {
         ballTrail[i].alpha = 0.15;
         app.stage.addChild(ballTrail[i]);
 
+        //Set default position to 0, 0
         ballLastPositions.push({"x": 0, "y": 0})
     }
     ballLastPositions.push({"x": 0, "y": 0})
 }
 
-//Create a ball
+//Create a ball, could have made a pool but it's only one ball at a time...
 let createBall = () => {
     if (ballSprite != null){
         ballSprite.destroy();
@@ -630,6 +656,9 @@ let createBall = () => {
     ballSpeedState = 0;
     ballAngle = 90;
 
+    //Starting ball direction
+    //Random direction if first ball
+    //Ball goes toward player who was scored on last
     if (lastPlayerScored == 0){
         randAngle = Math.floor(Math.random() * 4)
 
@@ -674,6 +703,7 @@ let createBall = () => {
     }
 }
 
+//Ball movement logic
 let moveBall = () => {
     if (ballStuck == 0){
         let ballOffsetX;
@@ -681,10 +711,12 @@ let moveBall = () => {
         let steppedLoc = {};
         const straightMulti = 1.4142;
 
+        //Use ball movement angle if reached server position
         if (ballAngle == 90 && ballSprite.y >= ballStartMovementY) {
             ballAngle = ballNextAngle;
         }
 
+        //Offsets for specific angles
         switch (ballAngle) {
             case 0:
                 ballOffsetX = ballSpeeds[ballSpeedState] * straightMulti;
@@ -720,6 +752,7 @@ let moveBall = () => {
                 break;
         }
 
+        //Set the next ball location and check if ball will go out of bounds
         targetX = ballSprite.x + ballOffsetX * (app.ticker.deltaMS * 0.01);
         targetY = ballSprite.y + ballOffsetY * (app.ticker.deltaMS * 0.01);
         steppedLoc = checkBallStep(targetX, targetY);
@@ -729,6 +762,7 @@ let moveBall = () => {
     
 }
 
+//Check next ball location, returns in bounds location if going oob
 let checkBallStep = (stepX, stepY) => {
     //Setup
     let ballTop;
@@ -742,6 +776,7 @@ let checkBallStep = (stepX, stepY) => {
     let returnY;
     let returnX;
 
+    //Check based on direaction of ball
     if (ballAngle == 135 || ballAngle == 180 || ballAngle == 225){
         paddleToCheck = p1;
         paddleIsPlayer = 1;
@@ -848,6 +883,7 @@ let checkBallStep = (stepX, stepY) => {
             }
         }
 
+        //Check if player will score
         if (paddleIsPlayer == 1 && stepX - ballSprite.width / 2 <= netXoffset){
             if (netCheck(1)){
                 ballAngle = reflectBallAngle(ballAngle, "x");
@@ -877,6 +913,7 @@ let checkBallStep = (stepX, stepY) => {
     return {"x": returnX, "y": returnY};
 }
 
+//Reflect ball angle based on plane
 let reflectBallAngle = (angleToReflect, plane) => {    
     if (plane == "x"){
         if (angleToReflect == 135) {
@@ -914,10 +951,12 @@ let reflectBallAngle = (angleToReflect, plane) => {
     }
 }
 
+//Update to ball trails
 let updateBallTrail = () => {
     if (ballSprite != null){
         ballTrailLagCount += 1
-
+        
+        //step locations back one
         if (ballTrailLagCount >= ballTrailLag){
             ballTrailLagCount = 0;
             ballLastPositions[3].x = ballLastPositions[2].x
@@ -944,6 +983,7 @@ let updateBallTrail = () => {
     }
 }
 
+//Reset ball trail for spawn
 let resetBallTrail = () => {
     for (i = 0; i < 4; i++){
         ballLastPositions[i].x = -100
@@ -977,6 +1017,7 @@ let updateBall = () => {
 
 }
 
+//Update ball halo sprite to visible if stuck
 let updateBallHalo = () => {
     if (ballStuck == 0){
         ballHalo.visible = false;
@@ -1697,6 +1738,7 @@ let menuStart = () => {
     menuPointers[1].visible = false;
     menuPointerState = 0;
     menuCanPointerChange = false;
+    menuHTP.visible = false;
 
     setTimeout(() => {
         sfxTitle.play();
@@ -1719,7 +1761,7 @@ let menuStart = () => {
 }
 
 let menuMove = (direc) => {
-    if (gameState == 1 && menuCanPointerChange) {
+    if (gameState == 1 && menuCanPointerChange && !menuHTP.visible) {
         if (direc == "up") {
             if (menuPointerState == 0) {
                 menuUpdatePointer(2);
@@ -1752,9 +1794,16 @@ let menuSelect = () => {
                 break;
             case 1:
                 //How to play
+                if (!menuHTP.visible) {
+                    menuHTP.visible = true;
+                }
+                else {
+                    menuHTP.visible = false;
+                }
                 break;
             case 2:
                 //Quit
+                history.back();
                 break;
         }
     }
